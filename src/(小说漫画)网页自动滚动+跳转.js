@@ -2,11 +2,11 @@
 // @name         (小说漫画)网页自动滚动+跳转
 // @author       bluesatan
 // @namespace    https://github.com/bluesatan0-0/WebpageAutoScrollNext
-// @version      2.1
-// @description  网页自动滚动，1~100速度可调，各网站速度独立保存。主控面板可拖拽、吸附边沿、自动隐藏。滚动效果丝滑流畅。新增"顶/底"快速跳转按钮。支持手动指定跳转按钮。支持空格键切换滚动。v2.1：空格键快捷滚动改为悬浮面板开关、默认关闭；提前视口内触发跳转、悬浮面板半透明不遮挡内容、优化下一页探测性能、增强规则解析鲁棒性、加固跳转安全性。
+// @version      2.2
+// @description  网页自动滚动，1~100速度可调，各网站速度独立保存。主控面板可拖拽、吸附边沿、自动隐藏。滚动效果丝滑流畅。新增"顶/底"快速跳转按钮。支持手动指定跳转按钮。支持空格键切换滚动。v2.2：自动跳转改为默认关闭，新增主面板"自动跳转"开关，需手动开启后才自动翻页/下一章；空格键快捷滚动改为悬浮面板开关、默认关闭；提前视口内触发跳转、悬浮面板半透明不遮挡内容、优化下一页探测性能、增强规则解析鲁棒性、加固跳转安全性。
 // @match        *://*/*
 // @grant        none
-// @date         2026.08.12
+// @date         2026.08.23
 // @license	 MIT license
 
 // ==/UserScript==
@@ -27,7 +27,7 @@
   let mouseOnBottomBtn = false;
 
   const PANEL_WIDTH = 110;
-  const PANEL_HEIGHT = 144;
+  const PANEL_HEIGHT = 168;
   const BTN_SIZE = 38;
   const BTN_GAP = 6;
   const STORAGE_KEY = 'autoScrollPanel_v2_viewport';
@@ -36,16 +36,16 @@
   const SCROLL_STATE_KEY = 'autoScrollState_v1';
   const DELAY_STORAGE_KEY = 'autoScrollDelay_v1';
   const SPACEKEY_STORAGE_KEY = 'autoScrollSpaceKey_v1';
+  const AUTO_JUMP_STORAGE_KEY = 'autoScrollAutoJump_v1';
   const CONFIG_PANEL_WIDTH = 340;
-  const VIEWPORT_BOTTOM_THRESHOLD = 0.30; // 下一页按钮进入视口底部30%区域即触发跳转
+  const VIEWPORT_BOTTOM_THRESHOLD = 0.30;
 
   let triggeredNextPage = false;
-  let cachedNextPageBtn = null; // v2.0：缓存下一页按钮，避免每帧全量扫描
+  let cachedNextPageBtn = null;
   let configVisible = false;
   let mouseOnConfigPanel = false;
   let nextPageDelayTimer = null;
 
-  // ========== 配置改为"自定义选择器"，不再作为白名单 ==========
   const DEFAULT_RULES = `# 可选：为特定网站自定义下一页按钮选择器
 # 格式：域名模式|CSS选择器|文本关键词
 # 当自动检测不准时，可在此指定精确选择器
@@ -98,14 +98,14 @@
   panel.style.left = panelSide === 'left' ? '0px' : (window.innerWidth - PANEL_WIDTH) + 'px';
   panel.style.top = Math.max(0, Math.min(lastYPosition, window.innerHeight - PANEL_HEIGHT)) + 'px';
 
-  // ========== v2.1：顶部 - 空格键快捷开关 ==========
+  // ========== 空格键快捷开关 ==========
   const spaceKeyBtn = document.createElement('button');
   spaceKeyBtn.style.display = 'flex';
   spaceKeyBtn.style.alignItems = 'center';
   spaceKeyBtn.style.justifyContent = 'center';
   spaceKeyBtn.style.gap = '10px';
   spaceKeyBtn.style.position = 'absolute';
-  spaceKeyBtn.style.top = '10px';
+  spaceKeyBtn.style.top = '8px';
   spaceKeyBtn.style.left = '14px';
   spaceKeyBtn.style.right = 'auto';
   spaceKeyBtn.style.height = '18px';
@@ -152,7 +152,6 @@
   spaceKeyBtn.appendChild(spaceKeyLabel);
   spaceKeyBtn.appendChild(spaceKeyToggle);
 
-  // 隐藏的状态载体 checkbox
   const spaceKeyCheckbox = document.createElement('input');
   spaceKeyCheckbox.type = 'checkbox';
   spaceKeyCheckbox.style.display = 'none';
@@ -172,6 +171,79 @@
     }
   }
 
+  // ========== v2.2：自动跳转开关 ==========
+  const autoJumpBtn = document.createElement('button');
+  autoJumpBtn.style.display = 'flex';
+  autoJumpBtn.style.alignItems = 'center';
+  autoJumpBtn.style.justifyContent = 'center';
+  autoJumpBtn.style.gap = '10px';
+  autoJumpBtn.style.position = 'absolute';
+  autoJumpBtn.style.top = '28px';
+  autoJumpBtn.style.left = '14px';
+  autoJumpBtn.style.right = 'auto';
+  autoJumpBtn.style.height = '18px';
+  autoJumpBtn.style.border = 'none';
+  autoJumpBtn.style.background = 'transparent';
+  autoJumpBtn.style.cursor = 'pointer';
+  autoJumpBtn.style.padding = '0';
+  autoJumpBtn.style.margin = '0 auto';
+  autoJumpBtn.style.outline = 'none';
+  autoJumpBtn.setAttribute('data-nodrag', 'true');
+  autoJumpBtn.setAttribute('type', 'button');
+
+  const autoJumpLabel = document.createElement('span');
+  autoJumpLabel.innerText = '自动跳转';
+  autoJumpLabel.style.color = 'rgba(255,255,255,0.35)';
+  autoJumpLabel.style.fontSize = '9px';
+  autoJumpLabel.style.fontWeight = '500';
+  autoJumpLabel.style.letterSpacing = '0.5px';
+  autoJumpLabel.style.pointerEvents = 'none';
+  autoJumpLabel.style.userSelect = 'none';
+
+  const autoJumpToggle = document.createElement('div');
+  autoJumpToggle.style.width = '24px';
+  autoJumpToggle.style.height = '13px';
+  autoJumpToggle.style.borderRadius = '13px';
+  autoJumpToggle.style.background = 'rgba(255,255,255,0.12)';
+  autoJumpToggle.style.position = 'relative';
+  autoJumpToggle.style.transition = 'background 0.2s ease';
+  autoJumpToggle.style.flexShrink = '0';
+  autoJumpToggle.style.pointerEvents = 'none';
+
+  const autoJumpKnob = document.createElement('div');
+  autoJumpKnob.style.width = '9px';
+  autoJumpKnob.style.height = '9px';
+  autoJumpKnob.style.borderRadius = '50%';
+  autoJumpKnob.style.background = 'rgba(255,255,255,0.7)';
+  autoJumpKnob.style.position = 'absolute';
+  autoJumpKnob.style.top = '2px';
+  autoJumpKnob.style.left = '2px';
+  autoJumpKnob.style.transition = 'transform 0.2s ease, background 0.2s';
+  autoJumpKnob.style.pointerEvents = 'none';
+
+  autoJumpToggle.appendChild(autoJumpKnob);
+  autoJumpBtn.appendChild(autoJumpLabel);
+  autoJumpBtn.appendChild(autoJumpToggle);
+
+  const autoJumpCheckbox = document.createElement('input');
+  autoJumpCheckbox.type = 'checkbox';
+  autoJumpCheckbox.style.display = 'none';
+
+  function updateAutoJumpToggleUI() {
+    if (!autoJumpCheckbox) return;
+    if (autoJumpCheckbox.checked) {
+      autoJumpToggle.style.background = '#6366f1';
+      autoJumpKnob.style.transform = 'translateX(11px)';
+      autoJumpKnob.style.background = '#fff';
+      autoJumpLabel.style.color = 'rgba(165,180,252,0.85)';
+    } else {
+      autoJumpToggle.style.background = 'rgba(255,255,255,0.12)';
+      autoJumpKnob.style.transform = 'translateX(0)';
+      autoJumpKnob.style.background = 'rgba(255,255,255,0.7)';
+      autoJumpLabel.style.color = 'rgba(255,255,255,0.35)';
+    }
+  }
+
   const speedLabel = document.createElement('div');
   speedLabel.innerText = '速度';
   speedLabel.style.color = 'rgba(255,255,255,0.4)';
@@ -179,7 +251,7 @@
   speedLabel.style.fontWeight = '500';
   speedLabel.style.letterSpacing = '1px';
   speedLabel.style.position = 'absolute';
-  speedLabel.style.top = '42px';
+  speedLabel.style.top = '62px';
   speedLabel.style.left = '14px';
   speedLabel.style.right = 'auto';
   speedLabel.style.textAlign = 'left';
@@ -199,7 +271,7 @@
   speedInput.value = String(savedSpeed);
 
   speedInput.style.position = 'absolute';
-  speedInput.style.top = '38px';
+  speedInput.style.top = '58px';
   speedInput.style.left = '52px';
   speedInput.style.transform = 'none';
   speedInput.style.width = '48px';
@@ -264,7 +336,7 @@
   toggleBtn.style.boxShadow = '0 4px 14px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.2)';
   toggleBtn.style.transition = 'transform 0.15s ease, box-shadow 0.2s ease';
   toggleBtn.style.position = 'absolute';
-  toggleBtn.style.top = '82px';
+  toggleBtn.style.top = '102px';
   toggleBtn.style.left = '54px';
   toggleBtn.style.transform = 'none';
 
@@ -281,7 +353,7 @@
   configBtn.innerHTML = '⚙';
   configBtn.title = '配置自定义选择器';
   configBtn.style.position = 'absolute';
-  configBtn.style.top = '91px';
+  configBtn.style.top = '111px';
   configBtn.style.left = '18px';
   configBtn.style.width = '24px';
   configBtn.style.height = '24px';
@@ -310,6 +382,7 @@
 
   panel.appendChild(configBtn);
   panel.appendChild(spaceKeyBtn);
+  panel.appendChild(autoJumpBtn);
   panel.appendChild(speedLabel);
   panel.appendChild(speedInput);
   panel.appendChild(toggleBtn);
@@ -356,7 +429,7 @@
   configPanel.appendChild(configTitle);
 
   const configDesc = document.createElement('div');
-  configDesc.innerHTML = '当自动检测"下一页"按钮不准时，可在此指定精确选择器。<br><span style="color:rgba(255,255,255,0.3);font-size:11px">v2.1：空格键快捷滚动改为悬浮面板开关，默认关闭</span><br>格式：<b style="color:#a5b4fc">域名模式|CSS选择器|文本关键词</b><br>使用 <b style="color:#a5b4fc">*</b> 作为通配符。留空表示使用自动检测。<br>若内容中包含 <b style="color:#a5b4fc">|</b> 请用反斜杠转义：<b style="color:#a5b4fc">\|</b>';
+  configDesc.innerHTML = '当自动检测"下一页"按钮不准时，可在此指定精确选择器。<br><span style="color:rgba(255,255,255,0.3);font-size:11px">v2.2：自动跳转改为默认关闭，新增主面板"自动跳转"开关</span><br>格式：<b style="color:#a5b4fc">域名模式|CSS选择器|文本关键词</b><br>使用 <b style="color:#a5b4fc">*</b> 作为通配符。留空表示使用自动检测。<br>若内容中包含 <b style="color:#a5b4fc">|</b> 请用反斜杠转义：<b style="color:#a5b4fc">\|</b>';
   configDesc.style.color = 'rgba(255,255,255,0.45)';
   configDesc.style.fontSize = '12px';
   configDesc.style.lineHeight = '1.6';
@@ -804,7 +877,6 @@
     } catch (e) {}
   }
 
-  // v2.1：空格键开关存取
   function loadSpaceKey() {
     try {
       const key = SPACEKEY_STORAGE_KEY + '_' + location.hostname;
@@ -826,13 +898,33 @@
     } catch (e) {}
   }
 
+  function loadAutoJump() {
+    try {
+      const key = AUTO_JUMP_STORAGE_KEY + '_' + location.hostname;
+      const saved = localStorage.getItem(key);
+      if (saved !== null) {
+        autoJumpCheckbox.checked = saved === 'true';
+        updateAutoJumpToggleUI();
+        return;
+      }
+    } catch (e) {}
+    autoJumpCheckbox.checked = false;
+    updateAutoJumpToggleUI();
+  }
+
+  function saveAutoJump() {
+    try {
+      const key = AUTO_JUMP_STORAGE_KEY + '_' + location.hostname;
+      localStorage.setItem(key, String(autoJumpCheckbox.checked));
+    } catch (e) {}
+  }
+
   function getDelayMs() {
     const v = parseFloat(delayInput.value);
     if (isNaN(v) || v < 0) return 2000;
     return Math.round(v * 1000);
   }
 
-  // ========== v1.9：增强规则解析，支持反斜杠转义 ==========
   function parseRules(text) {
     return text.split('\n')
       .map(line => line.trim())
@@ -880,7 +972,6 @@
     return rect.width > 0 && rect.height > 0;
   }
 
-  // ========== v1.9：性能优化，分层扫描策略 ==========
   function findNextButtonGeneric() {
     const keywords = [
       '下一章', '下一页', 'next chapter', '下一节', '下章', '下页',
@@ -900,7 +991,6 @@
     let elements = [];
     const seen = new Set();
 
-    // 第一层：语义容器内扫描（高精度、低数量）
     for (const sel of semanticContainers) {
       let containers;
       try {
@@ -919,7 +1009,6 @@
       }
     }
 
-    // 第二层：若语义容器候选不足，补充全文档的 <a> / <button> 等交互元素
     const MIN_CANDIDATES = 8;
     if (elements.length < MIN_CANDIDATES) {
       try {
@@ -933,7 +1022,6 @@
       } catch (e) {}
     }
 
-    // 第三层：仍不足时，全文档扫描 div/span/p 等容器（兜底）
     if (elements.length < MIN_CANDIDATES) {
       try {
         const all = document.querySelectorAll(candidateTags);
@@ -948,7 +1036,7 @@
 
     let bestMatch = null;
     let bestScore = 0;
-    const MIN_INTERACTIVE_SIZE = 20; // px，过滤无意义纯文本节点
+    const MIN_INTERACTIVE_SIZE = 20;
 
     for (const el of elements) {
       const rawText = (el.innerText || el.textContent || el.value || el.title || el.getAttribute('aria-label') || '').toLowerCase();
@@ -965,7 +1053,6 @@
       if (!matchedKeyword) continue;
       if (!isElementVisible(el)) continue;
 
-      // v1.9：对非交互容器增加尺寸过滤，避免扫描海量无意义文本节点
       const tag = el.tagName.toLowerCase();
       const isContainer = (tag === 'div' || tag === 'span' || tag === 'p' || tag === 'li' || tag === 'td' || tag === 'th');
       if (isContainer) {
@@ -1009,12 +1096,10 @@
     return bestMatch;
   }
 
-  // ========== 查找下一页：优先使用自定义选择器，否则自动检测 ==========
   function findNextPageButton() {
     const rules = parseRules(configTextarea.value);
     const hostname = location.hostname.toLowerCase();
 
-    // 查找匹配当前域名的规则
     const matchedRule = rules.find(rule => {
       if (!rule.pattern) return false;
       const pattern = rule.pattern.replace(/\*/g, '.*');
@@ -1026,7 +1111,6 @@
       }
     });
 
-    // 如果匹配到规则且提供了选择器，优先使用
     if (matchedRule && matchedRule.selector) {
       const btn = document.querySelector(matchedRule.selector);
       if (btn && isElementVisible(btn)) {
@@ -1038,7 +1122,6 @@
       }
     }
 
-    // 否则使用通用自动检测
     return findNextButtonGeneric();
   }
 
@@ -1062,7 +1145,6 @@
     } catch (e) {}
   }
 
-  // ========== v1.9：安全性加固，过滤危险协议 ==========
   function isSafeHref(href) {
     if (!href) return false;
     const lower = href.toLowerCase().trim();
@@ -1090,9 +1172,8 @@
 
     nextPageDelayTimer = setTimeout(() => {
       nextPageDelayTimer = null;
-      cachedNextPageBtn = null; // v2.0：跳转前清空缓存
+      cachedNextPageBtn = null;
       const href = nextBtn.getAttribute('href');
-      // v1.9：使用安全校验替代简单字符串判断
       if (nextBtn.tagName === 'A' && isSafeHref(href)) {
         location.href = nextBtn.href;
       } else {
@@ -1108,7 +1189,7 @@
     const baseSpeed = Math.pow(speed / 20, 1.6);
     scrolling = true;
     triggeredNextPage = false;
-    cachedNextPageBtn = null; // v2.0：滚动开始时清空缓存
+    cachedNextPageBtn = null;
     if (nextPageDelayTimer) {
       clearTimeout(nextPageDelayTimer);
       nextPageDelayTimer = null;
@@ -1137,26 +1218,30 @@
         const currentScroll = window.scrollY;
         const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
 
-        // v2.0：当下一页按钮进入视口底部阈值区域时提前触发跳转
-        // 避免用户被迫滚动完底部广告/推荐等非正文内容
-        if (!cachedNextPageBtn || !document.body.contains(cachedNextPageBtn) || !isElementVisible(cachedNextPageBtn)) {
-          cachedNextPageBtn = findNextPageButton();
-        }
-        if (cachedNextPageBtn) {
-          const btnRect = cachedNextPageBtn.getBoundingClientRect();
-          const thresholdY = window.innerHeight * (1 - VIEWPORT_BOTTOM_THRESHOLD);
-          if (btnRect.top >= 0 && btnRect.top <= thresholdY && btnRect.bottom <= window.innerHeight + 50) {
+        if (autoJumpCheckbox.checked) {
+          if (!cachedNextPageBtn || !document.body.contains(cachedNextPageBtn) || !isElementVisible(cachedNextPageBtn)) {
+            cachedNextPageBtn = findNextPageButton();
+          }
+          if (cachedNextPageBtn) {
+            const btnRect = cachedNextPageBtn.getBoundingClientRect();
+            const thresholdY = window.innerHeight * (1 - VIEWPORT_BOTTOM_THRESHOLD);
+            if (btnRect.top >= 0 && btnRect.top <= thresholdY && btnRect.bottom <= window.innerHeight + 50) {
+              stopScroll();
+              tryAutoNextPage();
+              return;
+            }
+          }
+
+          if (currentScroll >= maxScroll - 2) {
             stopScroll();
             tryAutoNextPage();
             return;
           }
-        }
-
-        // v1.9：增加 2px 容差，避免缩放/小数像素导致无法触发
-        if (currentScroll >= maxScroll - 2) {
-          stopScroll();
-          tryAutoNextPage();
-          return;
+        } else {
+          if (currentScroll >= maxScroll - 2) {
+            stopScroll();
+            return;
+          }
         }
 
         window.scrollBy(0, scrollNow);
@@ -1170,7 +1255,7 @@
 
   function stopScroll() {
     scrolling = false;
-    cachedNextPageBtn = null; // v2.0：停止时清空缓存
+    cachedNextPageBtn = null;
     if (scrollRAF) {
       cancelAnimationFrame(scrollRAF);
       scrollRAF = null;
@@ -1190,7 +1275,6 @@
   });
   speedInput.addEventListener('input', resetHideTimer);
 
-  // v2.1：空格键快捷滚动由悬浮面板开关控制，默认关闭
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
       return;
@@ -1273,12 +1357,21 @@
   loadConfig();
   loadDelay();
   loadSpaceKey();
+  loadAutoJump();
 
   spaceKeyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     spaceKeyCheckbox.checked = !spaceKeyCheckbox.checked;
     updateSpaceKeyToggleUI();
     saveSpaceKey();
+    resetHideTimer();
+  });
+
+  autoJumpBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    autoJumpCheckbox.checked = !autoJumpCheckbox.checked;
+    updateAutoJumpToggleUI();
+    saveAutoJump();
     resetHideTimer();
   });
 
