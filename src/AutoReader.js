@@ -1,6 +1,10 @@
 // ==UserScript==
 // @name AutoReader
 // @namespace https://github.com/bluesatan0-0/AutoReader
+// @downloadURL     https://github.com/bluesatan0-0/AutoReader/main/AutoReader.js
+// @updateURL       https://github.com/bluesatan0-0/AutoReader/main/AutoReader.js
+// @homepageURL     https://greasyfork.org/zh-CN/scripts/590642-autoreader
+// @supportURL      https://github.com/bluesatan0-0/AutoReader/issues
 // @version 3.0
 // @description 网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助。
 // @match        *://*/*
