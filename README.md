@@ -1,120 +1,223 @@
 # AutoReader
 
-一个轻量、优雅的浏览器油猴脚本，为所有网页提供**自动滚动跳转 + 整章朗读**体验：丝滑滚动、智能识别"下一页/下一章"按钮自动翻页，并能识别正文逐段语音朗读、读完自动续读。适用于小说朗读、小说漫画阅读。
+[English](#english) | [中文](#中文)
+
+---
+
+## 中文
+
+一个轻量、高效的浏览器油猴脚本，专为网页阅读场景设计。支持自动滚动、智能翻页、整章朗读与阅读辅助，特别适合小说、漫画、文章等长内容的连续阅读。
 
 ![version](https://img.shields.io/badge/version-3.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
+![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
 
-## ✨ 功能特性
+### ✨ 核心功能
 
-- **全局可用** — 适配所有网站，悬浮按钮/面板自动吸附屏幕左右边缘
-- **双模式标签页** — 面板分"滚动 / 朗读"两个标签页，互不串扰；选中标签页按站点记忆
-- **丝滑滚动** — 基于 `requestAnimationFrame`，1~100 级速度无级调节，帧率无关的匀速体验；滚动中修改速度立即生效
-- **整章朗读/小说朗读** — 正文智能识别，逐段播报并自动滚动跟随高亮；支持音色选择、语速调节（0.5~5）、试听
-- **读完自动续读** — 朗读读完后立即跳转下一章并自动恢复朗读，无需等待延迟
-- **智能记忆** — 每个域名的滚动速度、跳转延迟、空格键开关、自动跳转开关、标签页、音色、面板展开状态独立保存
-- **≡ 菜单悬浮按钮** — 收起态为贴边停靠的 ≡ 悬浮按钮：可拖拽换位（触屏同样支持），点击后先滑动到菜单按钮位置、再从按钮向左右/向下展开成播放器式面板；鼠标离开面板 0.6 秒自动缩回按钮
-- **提前视口触发** — 下一页按钮进入视口底部 30% 区域即自动停止并准备跳转，无需被迫看完底部广告和推荐
-- **自动下一页（手动开启）** — 滚到"下一章"按钮出现时自动停止并延迟跳转；**默认关闭**，需手动开启，避免误跳转
-- **空格键快捷操作** — 按当前选中标签页路由：滚动页控滚动启停、朗读页控朗读播放/暂停（均需先在面板开启对应开关，默认关闭）
-- **自定义选择器** — 当自动检测不准时，可为特定网站配置精确的 CSS 选择器，支持 `|` 字符转义；滚动与朗读共用一套规则
-- **半透明不遮挡** — 深色毛玻璃 UI，低透明度，正文内容清晰透出
-- **安全性加固** — 自动过滤 `javascript:`、`data:`、`vbscript:`、`file:` 等危险协议，防止恶意跳转
-- **性能优化** — 分层 DOM 扫描 + 600ms 探测节流 + 候选总量上限，长页面滚动不卡顿
+#### 自动滚动
+- 基于 `requestAnimationFrame`，帧率无关的匀速体验
+- 1~100 级无级调节，实时生效
+- 每个域名独立保存速度设置
 
-## 📦 安装
+#### 智能翻页
+- 分层 DOM 扫描策略（语义区域优先）
+- 自动识别"下一页 / 下一章"按钮
+- 提前视口触发，减少底部广告观看
+- 自动跳转默认关闭，防止误操作
 
-1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey / Greasemonkey）
-2. [点击此处安装脚本](https://update.greasyfork.org/scripts/562875/%E7%BD%91%E9%A1%B5%E7%BB%99%E6%88%91%E6%BB%9Auto%20Scroll.user.js)
+#### 整章朗读
+- 正文智能识别（支持多种容器结构）
+- 逐段播报并滚动高亮跟随
+- 音色选择、语速调节（0.5~5）、试听功能
+- 读完自动续读下一章
 
-## 🎮 使用说明
+#### 全局适配
+- 适用绝大多数网站
+- 半透明不遮挡正文内容
+- 悬浮按钮吸附屏幕边缘
+- 双标签页模式（滚动 / 朗读分离）
+
+#### 安全与性能
+- 危险协议过滤（javascript:、data: 等）
+- 分层扫描 + 节流策略
+- 长页面稳定流畅
+
+### 📦 安装
+
+1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/)、Violentmonkey 或 Greasemonkey
+2. [点击安装脚本](https://update.greasyfork.org/scripts/562875/%E7%BD%91%E9%A1%B5%E7%BB%99%E6%88%91%E6%BB%9Auto%20Scroll.user.js)
+3. 进入任意网页，点击悬浮按钮开始使用
+
+### 🎮 快速上手
 
 | 操作 | 说明 |
 | --- | --- |
-| 点击 ≡ 悬浮按钮 | 按钮滑动到菜单位置并展开为面板 |
+| 点击 ≡ 悬浮按钮 | 展开控制面板 |
 | 点击 ▶ / ■（滚动页） | 开始 / 停止滚动 |
 | 点击 ▶ / ⏸（朗读页） | 播放 / 暂停朗读 |
-| 点击"滚动" / "朗读"文字 | 切换功能标签页 |
-| 按 `Space` | 按当前标签页启停（需先在对应页面开启「空格键」开关，输入框内除外） |
-| 输入速度按 `Enter` | 保存速度并立即开始滚动（滚动页） |
-| 拖拽悬浮按钮 / 面板 | 可吸附到屏幕左侧或右侧，位置按站点自动记忆 |
-| 点击 ☰ | 收起面板，回到 ≡ 悬浮按钮形态 |
-| 鼠标离开面板 | 0.6 秒后自动缩回为悬浮按钮 |
+| 点击标签文字切换 | 在滚动和朗读间切换 |
+| 按 `Space` | 当前模式启停（需先开启开关） |
+| 拖拽悬浮按钮 | 吸附到左右边缘，自动记忆位置 |
+| 鼠标离开面板 | 0.6 秒后自动缩回 |
 
-## ⚙️ 配置面板
+### ⚙️ 配置选项
 
-展开面板后，"滚动"与"朗读"两页均提供底部入口打开配置：
+#### 滚动模式
+- **滚动速度**：1~100 级
+- **跳转延迟**：0~10 秒（默认 2 秒）
+- **空格键启停**：默认关闭
+- **自动跳转**：默认关闭（开启后在页面末尾自动翻页）
 
-### 滚动页
+#### 朗读模式
+- **朗读语速**：0.5~5（调整不打断当前句）
+- **音色选择**：本地/在线语音，切换试听
+- **空格键控制**：默认关闭
+- **自动续读**：读完自动跳转下一章并继续
 
-- **滚动速度**：1 ~ 100
-- **跳转延迟**：0 ~ 10 秒（步进 0.5 秒，默认 2 秒），按站点独立保存
-- **空格键滚动**：开启后空格键启停滚动（默认关闭）
-- **自动跳转**：开启后滚到末尾/按钮进入视口自动翻页（默认关闭）
+#### 自定义规则
+当自动检测失效时，可为特定网站配置：
+- **域名模式**：如 `*qidian.com*`（支持通配符）
+- **CSS 选择器**：精确指定下一页按钮
+- **文本关键词**：二次校验按钮文字
+- **转义支持**：`|` 字符使用 `\|` 转义
 
-### 朗读页
+### 🧠 技术设计
 
-- **朗读语速**：0.5 ~ 5（调整不打断当前句，下一句生效）
-- **语音音色**：本地/在线语音下拉选择，切换即试听，按站点记忆
-- **空格键朗读**：开启后空格键播放/暂停（默认关闭）
-- **自动跳转**：开启后读完立即跳转下一章并续读（默认关闭）
+#### 下一页检测
+脚本采用智能分层扫描：
+1. **第一层**：优先扫描语义化区域（`nav`、`article`、`footer` 等）
+2. **第二层**：补充扫描全文档的交互元素（`<a>`、`<button>` 等）
+3. **第三层**：兜底扫描容器元素，过滤无意义小尺寸节点
 
-### 自定义下一页选择器
+检测过程 600ms 节流，按钮进入视口底部 30% 时自动停止。
 
-当某些网站的"下一页"按钮无法被自动检测时，可添加规则：
+#### 朗读识别
+- 优先匹配常见正文容器（`#content`、`.readcontent`、`article` 等）
+- 启发式打分：文本长度、标点密度、链接占比
+- 按 `<p>` 分段，过滤噪声行（上一章、下一章、广告等）
+- 逐段播报时自动滚动到视口中央并高亮
 
-- **域名模式**：如 `*qidian.com*`（`*` 为通配符）
-- **CSS选择器**：如 `a#nextChapter`、`.bottem2 a:nth-child(3)`
-- **文本关键词**：可选，用于二次校验按钮文字
-- **转义支持**：若选择器或关键词中本身包含 `|` 字符，请使用反斜杠转义：`\|`
-
-## 🧠 自动下一页原理
-
-脚本采用**分层扫描策略**实时检测页面中的"下一章/下一页"按钮：
-
-1. **第一层**：优先扫描语义化导航区域（`nav` / `article` / `footer` / 含 `page/chapter/nav` 的 class/id），命中率高且节点极少
-2. **第二层**：候选不足时补充扫描全文档的 `<a>` / `<button>` 等交互元素
-3. **第三层**：兜底扫描 `div/span/p` 等容器，提前过滤尺寸小于 20px 的无意义节点，候选总量设上限 1200
-
-滚动过程中探测按 600ms 节流。当按钮**进入视口底部 30% 区域**（或页面已滚到底）且**「自动跳转」开关已开启**时：
-
-1. 立即停止滚动
-2. 等待设定的延迟时间（给用户阅读末尾内容的时间）
-3. 自动点击按钮跳转（危险协议会被安全拦截）
-4. 新页面加载后自动恢复之前的滚动状态
-
-> ⚠️ **注意**：自动跳转默认关闭，需在主面板手动开启。关闭后滚动至底部仅停止，不会触发任何页面跳转。
-
-## 🗣️ 朗读原理
-
-1. **正文识别**：优先匹配常见正文容器（`#content` / `.readcontent` / `article` / `main` 等），未命中则对页面分块启发式打分（文本长度、标点密度、链接密度），并排除导航/侧栏/广告及**脚本自身 UI 与 `script`/`style` 标签内容**
-2. **段落提取**：按 `<p>` 分段（不足时按 `<br>` 切分），过滤"上一章/下一章/笔趣阁"等噪声行与重复段落
-3. **逐段播报**：每段滚动到视口中央并高亮跟随；`onend` 自动推进，3 秒看门狗防卡死；每 8 秒 `pause/resume` 保活规避 Chrome 长文本中断问题
-4. **读完续读**：开启「自动跳转」后，最后一段读完立即跳转下一章并自动恢复朗读
-
-### 支持的按钮文本（自动检测）
-
-`下一章`、`下一页`、`下一话`、`next_chap`、`next chapter`、`下一回`、`下一卷`、`下一篇`、`下章`、`下页`、`次の章`、`다음 화` 等。
-
-## 📝 更新日志
+### 📝 更新日志
 
 | 版本 | 更新内容 |
 | --- | --- |
-| **3.0** | **新增整章朗读/小说朗读**：正文智能识别、逐段高亮跟随、音色/语速调节（0.5~5，调整不打断当前句、下一句生效）、试听、读完跳转下一页续读；**UI 重构**：收起态改为贴边停靠的 ≡ 菜单悬浮按钮（面板同款毛玻璃配色），可拖拽换位、触屏支持，鼠标离开自动缩回；面板分"滚动/朗读"双标签页并按站点记忆，滚动/朗读互斥切换，空格键按当前标签页路由；滚动中修改速度即时生效；下一页探测 600ms 节流 + 候选上限 1200；正文识别排除脚本自身 UI 与 script/style 内容；修复 hover 覆盖激活底色、收起态样式被异步重置、收起态拖拽不跟随等问题；自动跳转仍为默认关闭 |
-| 2.2 | **自动跳转改为默认关闭**：新增主面板「自动跳转」独立开关，默认关闭，需手动开启后才会在滚动至底部或检测到下一页按钮时自动翻页/下一章；按域名独立记忆开关状态；关闭自动跳转后滚动至底部仅停止，不再触发跳转；面板布局微调以容纳新开关；配置面板说明文案同步更新 |
-| 2.1 | **空格键快捷滚动改为悬浮面板开关**：默认关闭，一键切换；彻底避免与视频播放、富文本编辑、游戏等冲突；每个域名独立记忆开关状态；面板布局改为绝对定位，元素不重叠 |
-| 2.0 | **提前视口触发**：按钮进入视口底部 30% 即停止，避免被迫看完底部广告；**半透明 UI**：面板/按钮全面降低不透明度，不遮挡正文内容；按钮位置缓存优化 |
-| 1.9 | **性能优化**：分层 DOM 扫描策略，语义区域优先，大幅减少 CPU 占用；**规则转义**：自定义选择器支持 `\\|` 反斜杠转义；**安全加固**：过滤 `javascript:` / `data:` / `vbscript:` / `file:` 危险协议；滚动到底增加 2px 容差 |
-| 1.8 | 移除网站白名单功能，改为网页跳转按钮的手动指定 |
-| 1.7 | 速度与延迟按域名独立存储；下一页按钮进入视口即停止 |
-| 1.6 | 修复重复变量声明导致的脚本崩溃；跳转延迟改为 UI 可配置 |
-| 1.5 | 增加跨页面滚动状态恢复；修复跳转定时器被取消的 bug |
-| 1.4 | 重写 UI：深色毛玻璃风格、更大尺寸、统一配色 |
-| 1.3 | 增加自动下一页功能；丰富关键词；增加 2 秒延迟；空格键切换 |
-| 1.2 | 增加网站白名单配置面板 |
-| 1.1 | 增加顶/底跳转按钮；增加设置按钮 |
-| 1.0 | 初始版本：基础自动滚动、速度调节、拖拽吸附 |
+| **v3.0** | 新增整章朗读/小说朗读、正文智能识别、逐段高亮、音色/语速调节、读完续读 |
+| **v2.2** | 自动跳转改为默认关闭、新增独立开关 |
+| **v2.1** | 悬浮面板优化、空格键改为面板开关、避免与输入框冲突 |
+| **v2.0** | 提前视口触发、半透明 UI、性能优化、安全加固 |
+| **v1.9** | 分层扫描、规则转义、协议过滤 |
+| **v1.0** | 初始版本：基础滚动、速度调节、吸附按钮 |
 
-## 📄 License
+### 📄 许可证
+
+MIT License
+
+---
+
+## English
+
+A lightweight and efficient Tampermonkey script designed for web reading scenarios. Supports automatic scrolling, intelligent page navigation, full-chapter reading, and reading assistance—particularly suitable for continuous reading of novels, comics, articles, and long-form content.
+
+![version](https://img.shields.io/badge/version-3.0-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
+
+### ✨ Key Features
+
+#### Auto Scroll
+- Based on `requestAnimationFrame` for frame-rate-independent smooth experience
+- 1-100 level speed adjustment with real-time effect
+- Per-domain speed settings automatically saved
+
+#### Smart Page Navigation
+- Multi-layer DOM scanning strategy (semantic areas prioritized)
+- Auto-detect "Next Page / Next Chapter" buttons
+- Early viewport trigger to avoid unnecessary bottom content
+- Auto-navigation disabled by default to prevent accidents
+
+#### Full-Chapter Reading
+- Intelligent main content recognition (supports various container structures)
+- Segment-by-segment reading with synchronized scrolling and highlighting
+- Voice selection, speed adjustment (0.5-5), and preview functionality
+- Auto-continue to next chapter after reading ends
+
+#### Universal Compatibility
+- Works with most websites
+- Semi-transparent UI that doesn't block content
+- Floating button auto-attaches to screen edges
+- Dual-tab mode (Scroll / Reading tabs separated)
+
+#### Safety & Performance
+- Dangerous protocol filtering (javascript:, data:, etc.)
+- Layered scanning + throttling strategy
+- Smooth performance on long pages
+
+### 📦 Installation
+
+1. Install browser extension: [Tampermonkey](https://www.tampermonkey.net/), Violentmonkey, or Greasemonkey
+2. [Click to install script](https://update.greasyfork.org/scripts/562875/%E7%BD%91%E9%A1%B5%E7%BB%99%E6%88%91%E6%BB%9Auto%20Scroll.user.js)
+3. Visit any webpage and click the floating button to start
+
+### 🎮 Quick Start
+
+| Action | Description |
+| --- | --- |
+| Click ≡ floating button | Expand control panel |
+| Click ▶ / ■ (Scroll tab) | Start / stop scrolling |
+| Click ▶ / ⏸ (Reading tab) | Play / pause reading |
+| Click tab label | Switch between scroll and reading modes |
+| Press `Space` | Start / stop current mode (toggle required first) |
+| Drag floating button | Attach to screen edge, position auto-saved |
+| Mouse leave panel | Auto-collapse after 0.6 seconds |
+
+### ⚙️ Configuration Options
+
+#### Scroll Mode
+- **Scroll Speed**: 1-100 levels
+- **Jump Delay**: 0-10 seconds (default 2s)
+- **Space Key Control**: Disabled by default
+- **Auto-Navigation**: Disabled by default (enables auto-flip at page end)
+
+#### Reading Mode
+- **Reading Speed**: 0.5-5 (adjustment doesn't interrupt current sentence)
+- **Voice Selection**: Local/online voices with preview on switch
+- **Space Key Control**: Disabled by default
+- **Auto-Continue**: Auto-jump to next chapter and continue reading
+
+#### Custom Rules
+When auto-detection doesn't work, configure rules for specific websites:
+- **Domain Pattern**: e.g., `*qidian.com*` (wildcard supported)
+- **CSS Selector**: Precisely specify next-page button
+- **Text Keyword**: Secondary verification of button text
+- **Escape Support**: Use `\|` to escape `|` character
+
+### 🧠 Technical Design
+
+#### Next Page Detection
+The script uses intelligent multi-layer scanning:
+1. **Layer 1**: Prioritizes semantic areas (`nav`, `article`, `footer`, etc.)
+2. **Layer 2**: Supplements with interactive elements in full document (`<a>`, `<button>`, etc.)
+3. **Layer 3**: Fallback scans container elements, filters meaningless small nodes
+
+Detection is throttled at 600ms intervals; stops when button enters bottom 30% of viewport.
+
+#### Reading Recognition
+- Prioritizes common main-content containers (`#content`, `.readcontent`, `article`, etc.)
+- Heuristic scoring: text length, punctuation density, link ratio
+- Segments by `<p>` tags, filters noise (previous/next chapter, ads, etc.)
+- Auto-scrolls to center of viewport and highlights during segment playback
+
+### 📝 Changelog
+
+| Version | Updates |
+| --- | --- |
+| **v3.0** | Added full-chapter reading, intelligent content recognition, segment highlighting, voice/speed adjustment, auto-continue |
+| **v2.2** | Auto-navigation now disabled by default, new independent toggle |
+| **v2.1** | Floating panel optimization, space key changed to panel toggle, avoid input field conflicts |
+| **v2.0** | Early viewport trigger, semi-transparent UI, performance optimization, security hardening |
+| **v1.9** | Multi-layer scanning, rule escaping, protocol filtering |
+| **v1.0** | Initial release: basic scrolling, speed control, floating button attachment |
+
+### 📄 License
 
 MIT License
