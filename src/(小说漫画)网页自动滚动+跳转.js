@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         (小说漫画)网页自动滚动+朗读
-// @author       bluesatan
-// @namespace    https://github.com/bluesatan0-0/WebpageAutoScrollNext
-// @version      3.0
-// @description  网页自动滚动+朗读。滚动：1~100速度可调、各网站独立保存、主控面板可拖拽吸附边沿、丝滑流畅、提前视口内触发跳转、支持手动指定跳转按钮；朗读：正文智能识别、逐段高亮跟随、音色/语速可调、读完自动跳转续读。v3.0：在2.2基础上新增整章朗读功能（正文识别/逐段高亮/音色语速/试听、读完立即跳转并续读）；UI重构为≡菜单悬浮按钮（贴边停靠、拖拽换位、点击滑动+从按钮展开成播放器式面板、鼠标离开自动缩回、触屏支持）；面板分“滚动/朗读”双标签页且按站点记忆，空格键按当前标签页路由启停；滚动中改速度即时生效；下一页探测性能优化（600ms节流+候选上限）；正文识别加固，排除脚本自身UI与script/style标签内容；自动跳转仍为默认关闭。
+// @name AutoReader
+// @namespace https://github.com/bluesatan0-0/AutoReader
+// @version 3.0
+// @description 网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助。
 // @match        *://*/*
 // @grant        none
+// @author       bluesatan
 // @date         2026.10.06
 // @license      MIT license
 // ==/UserScript==
