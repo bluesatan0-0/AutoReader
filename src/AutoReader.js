@@ -3,12 +3,12 @@
 // @namespace       https://github.com/bluesatan0-0/AutoReader
 // @homepageURL     https://github.com/bluesatan0-0/AutoReader
 // @supportURL      https://github.com/bluesatan0-0/AutoReader/issues
-// @version 3.0.1
+// @version 3.0.2
 // @description  网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助。
 // @match        *://*/*
 // @grant        none
 // @author       bluesatan
-// @date         2026.10.06
+// @date         2026.10.07
 // @license      MIT license
 // @downloadURL https://update.greasyfork.org/scripts/590642/AutoReader.user.js
 // @updateURL https://update.greasyfork.org/scripts/590642/AutoReader.meta.js
@@ -25,6 +25,7 @@
   let scrollTimestamp = 0;
   let scrollAccumulated = 0;
   let liveBaseSpeed = Math.pow(10 / 20, 1.6);   // 当前生效的滚动速度系数，滚动中改速度立即生效
+  let prevScrollBehavior = null;                 // [FIX P0-1] 记录原 scroll-behavior 以便恢复
 
   let expanded = false;               // 悬浮条是否展开成窗口
   let panelSide = 'left';             // 吸左/右边（默认左，与旧版悬浮面板一致）
@@ -54,6 +55,11 @@
   let lastProbeAt = 0;              // 滚动中"下一页"探测节流时间戳，避免每帧全页扫描
   let configVisible = false;
   let nextPageDelayTimer = null;
+  let nextPageToken = 0;            // [FIX P0-3] 定时器代际守卫，防止过期跳转
+
+  // [FIX P2-8] 规则缓存
+  let cachedRules = null;
+  let cachedRulesText = '__uninitialized__';
 
   const ACCENT = 'linear-gradient(135deg,#6366f1,#8b5cf6)';
   const ICON_SCROLL_DOWN = '<span style="display:inline-block;transform:rotate(90deg);line-height:1;">\u25B6</span>';  // 复用朗读播放的三角形(▶ U+25B6)旋转90度朝下，与播放按钮三角形完全同款，仅方向不同
@@ -180,6 +186,24 @@
     return r;
   }
 
+  // 开关（上下文中多处使用，函数声明提升使其可在下方被调用）
+  function makeToggle() {
+    const pill = document.createElement('div');
+    pill.style.cssText = 'width:44px;height:22px;border-radius:22px;background:rgba(148,163,184,0.55);'+
+      'position:relative;transition:background 0.2s;cursor:pointer;flex-shrink:0;align-self:center;';
+    const knob = document.createElement('div');
+    knob.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;'+
+      'transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);';
+    pill.appendChild(knob);
+    const box = document.createElement('input'); box.type = 'checkbox'; box.style.display = 'none';
+    pill.__box = box; pill.__knob = knob;
+    return pill;
+  }
+  function paintToggle(pill, on) {
+    pill.style.background = on ? 'linear-gradient(135deg,#818cf8,#a78bfa)' : 'rgba(148,163,184,0.55)';
+    pill.__knob.style.transform = on ? 'translateX(22px)' : 'translateX(0)';
+  }
+
   // ---------- 标签页（滚动 / 朗读）：切换直接由第一行底部文字承担，不再新增单独一行按钮 ----------
   let activeTab = 'scroll';
   function makePanel() {
@@ -234,7 +258,7 @@
     'border:1px solid rgba(255,255,255,0.22);background:#1c1c26;color:#fff;'+
     'font-size:11px;outline:none;box-sizing:border-box;padding:0 4px;color-scheme:dark;';
   row2.appendChild(makeCell('语音音色', ttsVoiceSel));
-  // 修复：第二行“朗读语速/语音音色”两行说明文字基线未对齐 —— 数字框与下拉框实际渲染高度略有差异，
+  // 修复：第二行"朗读语速/语音音色"两行说明文字基线未对齐 —— 数字框与下拉框实际渲染高度略有差异，
   // 在 align-items:flex-start(顶部对齐) 下会把各自下方的说明文字顶成一高一低。
   // 改为底部对齐，使两行说明文字落在同一条基线上，控件顶部观感保持不变。
   row2.style.alignItems = 'flex-end';
@@ -251,22 +275,6 @@
 
   // ---------- 滚动页：功能开关（空格键 / 自动跳转） ----------
   const row3 = rowFlex(scrollPanel);
-  function makeToggle() {
-    const pill = document.createElement('div');
-    pill.style.cssText = 'width:44px;height:22px;border-radius:22px;background:rgba(148,163,184,0.55);'+
-      'position:relative;transition:background 0.2s;cursor:pointer;flex-shrink:0;align-self:center;';
-    const knob = document.createElement('div');
-    knob.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;'+
-      'transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);';
-    pill.appendChild(knob);
-    const box = document.createElement('input'); box.type = 'checkbox'; box.style.display = 'none';
-    pill.__box = box; pill.__knob = knob;
-    return pill;
-  }
-  function paintToggle(pill, on) {
-    pill.style.background = on ? 'linear-gradient(135deg,#818cf8,#a78bfa)' : 'rgba(148,163,184,0.55)';
-    pill.__knob.style.transform = on ? 'translateX(22px)' : 'translateX(0)';
-  }
   const spaceKeyToggle = makeToggle();
   const autoJumpToggle = makeToggle();
   row3.appendChild(makeCell('空格键滚动', spaceKeyToggle));
@@ -564,8 +572,14 @@
   // ============================================================
   //  存储读写
   // ============================================================
-  function loadConfig() { try { const s = localStorage.getItem(CONFIG_STORAGE_KEY); configTextarea.value = s || DEFAULT_RULES; } catch (e) { configTextarea.value = DEFAULT_RULES; } }
-  function saveConfig() { try { localStorage.setItem(CONFIG_STORAGE_KEY, configTextarea.value); } catch (e) {} }
+  function loadConfig() {
+    try { const s = localStorage.getItem(CONFIG_STORAGE_KEY); configTextarea.value = s || DEFAULT_RULES; }
+    catch (e) { configTextarea.value = DEFAULT_RULES; }
+  }
+  function saveConfig() {
+    try { localStorage.setItem(CONFIG_STORAGE_KEY, configTextarea.value); } catch (e) {}
+    cachedRules = null; cachedRulesText = '__invalidated__';  // [FIX P2-8] 保存后立即失效缓存
+  }
   function loadDelay() { try { const s = localStorage.getItem(DELAY_STORAGE_KEY); if (s !== null) { const v = parseFloat(s); if (!isNaN(v) && v >= 0 && v <= 10) { delayInput.value = String(Math.round(v * 2) / 2); return; } } } catch (e) {} delayInput.value = '2'; }
   function saveDelay() { try { localStorage.setItem(DELAY_STORAGE_KEY, delayInput.value); } catch (e) {} }
   function loadTtsRate() { try { const s = localStorage.getItem(TTS_RATE_STORAGE_KEY); if (s !== null) { const v = parseFloat(s); if (!isNaN(v) && v >= 0.5 && v <= 5) { ttsRateInput.value = String(v); tts.rate = v; return; } } } catch (e) {} ttsRateInput.value = '2'; tts.rate = 2; }
@@ -611,6 +625,15 @@
       return { pattern: parts[0] || '', selector: parts[1] || '', keyword: parts[2] || '' };
     });
   }
+  // [FIX P2-8] 规则缓存：仅当 textarea 内容发生变化时才重新解析
+  function getRules() {
+    const txt = configTextarea.value;
+    if (cachedRulesText !== txt) {
+      cachedRulesText = txt;
+      cachedRules = parseRules(txt);
+    }
+    return cachedRules || [];
+  }
   function isElementVisible(el) {
     if (!el) return false; if (!document.body.contains(el)) return false;
     const style = window.getComputedStyle(el);
@@ -620,6 +643,7 @@
   }
   function findNextButtonGeneric() {
     const keywords = ['下一章','下一页','next chapter','下一节','下章','下页','下一话','next_chap','next chap','下一回','下一卷','下一篇','下回','next page','下一章節','下一話','下一頁','下一节','下节','下話','次の章','次へ','다음','다음 장','다음 화','后一章','后一节','后一页'];
+    const lcKeywords = keywords.map(k => k.toLowerCase());
     // 轻量候选：容器内先扫交互/行内标签；div/span/p 仅在候选不足时按需补扫，避免超大页面卡顿
     const candidateTags = 'a, button, [role="button"], input[type="button"], input[type="submit"], li, strong, b, em, i, label, td, th, h1, h2, h3, h4, h5, h6';
     const candidateTagsHeavy = 'div, span, p';
@@ -650,13 +674,26 @@
         }
       } catch (e) {}
     }
-    let bestMatch = null, bestScore = 0;
+
+    // [FIX P1-7] 两阶段：先按纯文本筛选（不触发布局），再对少量命中做可见性检查
+    const textHits = [];
     for (const el of elements) {
-      const raw = (el.innerText || el.textContent || el.value || el.title || el.getAttribute('aria-label') || '').toLowerCase();
+      const raw = (el.textContent || el.value || el.title || el.getAttribute('aria-label') || '').toLowerCase();
       const text = raw.replace(/\s+/g, ' ').trim();
+      if (!text) continue;
       let matched = null;
-      for (const kw of keywords) { if (text === kw.toLowerCase() || text.includes(kw.toLowerCase())) { matched = kw; break; } }
-      if (!matched) continue; if (!isElementVisible(el)) continue;
+      for (let i = 0; i < lcKeywords.length; i++) {
+        const kw = lcKeywords[i];
+        if (text === kw || text.includes(kw)) { matched = keywords[i]; break; }
+      }
+      if (!matched) continue;
+      textHits.push({ el: el, text: text, matched: matched });
+    }
+
+    let bestMatch = null, bestScore = 0;
+    for (const hit of textHits) {
+      const el = hit.el, text = hit.text, matched = hit.matched;
+      if (!isElementVisible(el)) continue;
       const tag = el.tagName.toLowerCase();
       if (tag === 'div' || tag === 'span' || tag === 'p' || tag === 'li' || tag === 'td' || tag === 'th') { const r = el.getBoundingClientRect(); if (r.width < MIN && r.height < MIN) continue; }
       let score = 100;
@@ -672,7 +709,7 @@
     if (!bestMatch) {
       for (const link of document.querySelectorAll('a[href]')) {
         const href = (link.getAttribute('href') || '').toLowerCase();
-        const text = (link.innerText || link.textContent || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const text = (link.textContent || '').toLowerCase().replace(/\s+/g, ' ').trim();
         if (href.includes('next') || href.includes('chapter') || href.match(/\d+/) || href.includes('page')) {
           if (text.includes('下') || text.includes('next') || text.includes('后') || text.includes('▶') || text.includes('→') || text.includes('>')) { if (isElementVisible(link)) { bestMatch = link; break; } }
         }
@@ -681,7 +718,7 @@
     return bestMatch;
   }
   function findNextPageButton() {
-    const rules = parseRules(configTextarea.value);
+    const rules = getRules();   // [FIX P2-8] 走缓存
     const hostname = location.hostname.toLowerCase();
     const matchedRule = rules.find(rule => { if (!rule.pattern) return false; const pattern = rule.pattern.replace(/\*/g, '.*'); try { return new RegExp(pattern, 'i').test(hostname); } catch (e) { return hostname.includes(rule.pattern.replace(/\*/g, '')); } });
     if (matchedRule && matchedRule.selector) { const btn = document.querySelector(matchedRule.selector); if (btn && isElementVisible(btn)) { if (!matchedRule.keyword) return btn; const text = (btn.innerText || btn.textContent || '').toLowerCase(); if (text.includes(matchedRule.keyword.toLowerCase())) return btn; } }
@@ -696,7 +733,15 @@
     const nextBtn = findNextPageButton(); if (!nextBtn) return;
     try { sessionStorage.setItem(SCROLL_STATE_KEY, JSON.stringify({ scrolling: true, speed: speedInput.value, timestamp: Date.now() })); } catch (e) {}
     const delayMs = getDelayMs();
-    nextPageDelayTimer = setTimeout(() => { nextPageDelayTimer = null; cachedNextPageBtn = null; const href = nextBtn.getAttribute('href'); if (nextBtn.tagName === 'A' && isSafeHref(href)) location.href = nextBtn.href; else nextBtn.click(); }, delayMs);
+    const token = ++nextPageToken;   // [FIX P0-3] 代际守卫：任何后续 stop/restart 都会让它作废
+    nextPageDelayTimer = setTimeout(() => {
+      if (token !== nextPageToken) return;   // 已被取消或重新触发
+      nextPageDelayTimer = null;
+      cachedNextPageBtn = null;
+      const href = nextBtn.getAttribute('href');
+      if (nextBtn.tagName === 'A' && isSafeHref(href)) location.href = nextBtn.href;
+      else nextBtn.click();
+    }, delayMs);
   }
   function computeBaseSpeed() { let speed = parseInt(speedInput.value, 10); if (isNaN(speed) || speed < 1) speed = 1; if (speed > 100) speed = 100; return Math.pow(speed / 20, 1.6); }
   function paintScrollBtn() {
@@ -709,13 +754,20 @@
     if (tts.playing) ttsStop(false);            // 互斥：启动滚动前先停朗读，避免朗读态下滚动逻辑/自动跳转被执行
     scrolling = true; cachedNextPageBtn = null; lastProbeAt = 0;
     if (nextPageDelayTimer) { clearTimeout(nextPageDelayTimer); nextPageDelayTimer = null; }
+    // [FIX P0-1] 自动滚动期间禁用站点自带的平滑滚动，避免逐帧 scrollBy 被动画化导致速度失真/卡死
+    if (prevScrollBehavior === null) {
+      prevScrollBehavior = document.documentElement.style.scrollBehavior || '';
+      document.documentElement.style.scrollBehavior = 'auto';
+    }
     paintScrollBtn();
     scrollTimestamp = 0; scrollAccumulated = 0;
     try { localStorage.setItem(getSpeedStorageKey(), String(speed)); } catch (e) {}
     function scrollStep(ts) {
       if (!scrolling) return;
       if (!scrollTimestamp) scrollTimestamp = ts;
-      const delta = ts - scrollTimestamp; scrollTimestamp = ts;
+      // [FIX P0-2] delta 封顶 100ms，防止后台标签页恢复时一次性冲出一大段
+      const delta = Math.min(ts - scrollTimestamp, 100);
+      scrollTimestamp = ts;
       scrollAccumulated += liveBaseSpeed * (delta / 16.67);
       let now = Math.floor(scrollAccumulated); scrollAccumulated -= now;
       if (now > 0) {
@@ -735,8 +787,14 @@
   }
   function stopScroll() {
     scrolling = false; cachedNextPageBtn = null;
+    nextPageToken++;    // [FIX P0-3] 让任何挂起的跳转定时器失效
     if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
     if (nextPageDelayTimer) { clearTimeout(nextPageDelayTimer); nextPageDelayTimer = null; }
+    // [FIX P0-1] 恢复站点原有的 scroll-behavior 内联值
+    if (prevScrollBehavior !== null) {
+      document.documentElement.style.scrollBehavior = prevScrollBehavior;
+      prevScrollBehavior = null;
+    }
     paintScrollBtn();
   }
   btnScroll.cell.addEventListener('click', (e) => { e.stopPropagation(); if (scrolling) stopScroll(); else startScroll(); });
@@ -791,15 +849,14 @@
   function paintPlayBtn() { const active = tts.playing && !tts.paused; btnPlay.btn.innerHTML = active ? '\u23F8' : '\u25B6'; if (active) btnPlay.btn.classList.add('is-active'); else btnPlay.btn.classList.remove('is-active'); btnPlay.btn.style.background = active ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'; btnPlay.cap.innerText = active ? '暂停' : '朗读'; }
   let playHintTimer = null;
   function flashPlayHint(msg) {
+    clearTimeout(playHintTimer);
     btnPlay.cap.style.display = 'block';
     btnPlay.cap.innerText = msg;
     btnPlay.cap.style.color = '#fca5a5';
     btnPlay.btn.style.background = 'rgba(239,68,68,0.28)';
-    clearTimeout(playHintTimer);
+    // [FIX P1-4] 结束后统一走 paintPlayBtn/paintTabs 恢复状态，避免手动写死颜色覆盖实际激活态
     playHintTimer = setTimeout(() => {
-      if (!tts.playing) paintPlayBtn();
-      btnPlay.btn.style.background = 'rgba(255,255,255,0.08)';
-      if (!expanded) btnPlay.cap.style.display = 'none';
+      paintPlayBtn();
       paintTabs();
     }, 1600);
   }
@@ -862,8 +919,25 @@
   btnPlay.btn.addEventListener('dblclick', (e) => { e.stopPropagation(); ttsStop(true); });
 
   function ttsPickVoice(vs) { const zh = vs.filter(v => /^zh([-_]|$)/i.test(v.lang)); const localZh = zh.filter(v => v.localService); return localZh.find(v => /xiaoxiao|xiaoyi|yunjian|hui|han|mei|ting/i.test(v.name)) || localZh[0] || zh.find(v => !/google|online|network/i.test(v.name)) || zh[0] || vs.find(v => v.localService) || vs[0] || null; }
-  function ttsLoadVoices() { const vs = speechSynthesis.getVoices(); if (!vs.length) return; tts.voice = ttsPickVoice(vs); ttsVoiceSel.innerHTML = ''; vs.forEach((v, i) => { const o = document.createElement('option'); o.value = String(i); const fullLabel = (v.localService ? '[本地] ' : '[在线] ') + v.name + ' (' + v.lang + ')'; o.textContent = fullLabel.length > 14 ? fullLabel.slice(0, 13) + '\u2026' : fullLabel; o.title = fullLabel; o.style.cssText = 'background:#1c1c26;color:#fff;'; ttsVoiceSel.appendChild(o); }); try { const saved = localStorage.getItem(VOICE_STORAGE_KEY + location.hostname); if (saved) { const si = vs.findIndex(v => (v.voiceURI || v.name) === saved); if (si >= 0) tts.voice = vs[si]; } } catch (e) {}
-  const zi = vs.indexOf(tts.voice); if (zi >= 0) ttsVoiceSel.value = String(zi); }
+  function ttsLoadVoices() {
+    const vs = speechSynthesis.getVoices(); if (!vs.length) return;
+    tts.voice = ttsPickVoice(vs);
+    ttsVoiceSel.innerHTML = '';
+    vs.forEach((v, i) => {
+      const o = document.createElement('option');
+      o.value = String(i);
+      const fullLabel = (v.localService ? '[本地] ' : '[在线] ') + v.name + ' (' + v.lang + ')';
+      // [FIX P2-6] 用 Array.from 按 Unicode 码点截断，避免半个中文字符 / emoji 被切开
+      const nameChars = Array.from(v.name);
+      const shortName = nameChars.length > 12 ? nameChars.slice(0, 11).join('') + '\u2026' : v.name;
+      o.textContent = (v.localService ? '本·' : '网·') + shortName;
+      o.title = fullLabel;
+      o.style.cssText = 'background:#1c1c26;color:#fff;';
+      ttsVoiceSel.appendChild(o);
+    });
+    try { const saved = localStorage.getItem(VOICE_STORAGE_KEY + location.hostname); if (saved) { const si = vs.findIndex(v => (v.voiceURI || v.name) === saved); if (si >= 0) tts.voice = vs[si]; } } catch (e) {}
+    const zi = vs.indexOf(tts.voice); if (zi >= 0) ttsVoiceSel.value = String(zi);
+  }
   function ttsWarmUp() {
     // 修复：不再 speak 音量0的静音 utterance 来'解锁'引擎。
     // 该静音 utterance 在部分 Chrome 下会长时间停留在 speaking/pending 不结束，
@@ -873,7 +947,12 @@
   // 调整语速不打断当前句：仅保存设置，新语速从下一句话开始生效
   ttsRateInput.addEventListener('change', () => { let v = parseFloat(ttsRateInput.value); if (isNaN(v)) v = 2; tts.rate = Math.min(5, Math.max(0.5, v)); ttsRateInput.value = String(tts.rate); saveTtsRate(); });
   ttsVoiceSel.addEventListener('change', () => { const vs = speechSynthesis.getVoices(); const i = parseInt(ttsVoiceSel.value, 10); if (vs[i]) { tts.voice = vs[i]; try { localStorage.setItem(VOICE_STORAGE_KEY + location.hostname, vs[i].voiceURI || vs[i].name); } catch (e) {} if (tts.playing && !tts.paused) { speechSynthesis.cancel(); ttsSpeakCurrent(); } else { const u = new SpeechSynthesisUtterance('你好，这是朗读音色测试。'); if (tts.voice) u.voice = tts.voice; u.lang = (tts.voice && tts.voice.lang) || 'zh-CN'; u.rate = tts.rate; u.volume = 1; speechSynthesis.speak(u); } } });
-  if (typeof speechSynthesis !== 'undefined') { ttsLoadVoices(); speechSynthesis.onvoiceschanged = () => { ttsLoadVoices(); ttsWarmUp(); }; }
+  if (typeof speechSynthesis !== 'undefined') {
+    ttsLoadVoices();
+    // [FIX P2-5] 用 addEventListener 替代 onvoiceschanged =，避免覆盖同页其他脚本的监听
+    try { speechSynthesis.addEventListener('voiceschanged', () => { ttsLoadVoices(); ttsWarmUp(); }); }
+    catch (e) { speechSynthesis.onvoiceschanged = () => { ttsLoadVoices(); ttsWarmUp(); }; }
+  }
 
   // ============================================================
   //  初始化
