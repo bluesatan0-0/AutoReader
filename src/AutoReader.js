@@ -3,12 +3,12 @@
 // @namespace       https://github.com/bluesatan0-0/AutoReader
 // @homepageURL     https://github.com/bluesatan0-0/AutoReader
 // @supportURL      https://github.com/bluesatan0-0/AutoReader/issues
-// @version 3.0.2
-// @description  网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助。
+// @version 3.0.3
+// @description  网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助、新增从选中处开始朗读。
 // @match        *://*/*
 // @grant        none
 // @author       bluesatan
-// @date         2026.10.07
+// @date         2026.11.13
 // @license      MIT license
 // @downloadURL https://update.greasyfork.org/scripts/590642/AutoReader.user.js
 // @updateURL https://update.greasyfork.org/scripts/590642/AutoReader.meta.js
@@ -25,7 +25,7 @@
   let scrollTimestamp = 0;
   let scrollAccumulated = 0;
   let liveBaseSpeed = Math.pow(10 / 20, 1.6);   // 当前生效的滚动速度系数，滚动中改速度立即生效
-  let prevScrollBehavior = null;                 // [FIX P0-1] 记录原 scroll-behavior 以便恢复
+  let prevScrollBehavior = null;                 // 记录原 scroll-behavior 以便恢复
 
   let expanded = false;               // 悬浮条是否展开成窗口
   let panelSide = 'left';             // 吸左/右边（默认左，与旧版悬浮面板一致）
@@ -55,14 +55,14 @@
   let lastProbeAt = 0;              // 滚动中"下一页"探测节流时间戳，避免每帧全页扫描
   let configVisible = false;
   let nextPageDelayTimer = null;
-  let nextPageToken = 0;            // [FIX P0-3] 定时器代际守卫，防止过期跳转
+  let nextPageToken = 0;            // 定时器代际守卫，防止过期跳转
 
-  // [FIX P2-8] 规则缓存
+  // 规则缓存
   let cachedRules = null;
   let cachedRulesText = '__uninitialized__';
 
   const ACCENT = 'linear-gradient(135deg,#6366f1,#8b5cf6)';
-  const ICON_SCROLL_DOWN = '<span style="display:inline-block;transform:rotate(90deg);line-height:1;">\u25B6</span>';  // 复用朗读播放的三角形(▶ U+25B6)旋转90度朝下，与播放按钮三角形完全同款，仅方向不同
+  const ICON_SCROLL_DOWN = '<span style="display:inline-block;transform:rotate(90deg);line-height:1;">\u25B6</span>';
 
   const DEFAULT_RULES = `# 可选：为特定网站自定义下一页按钮选择器
 # 格式：域名模式|CSS选择器|文本关键词
@@ -136,15 +136,14 @@
       'border-radius:9px;line-height:1.3;transition:background 0.15s ease;';
     cell.appendChild(btn); cell.appendChild(cap);
     btnRow.appendChild(cell);
-    // hover 高亮仅在按钮未处于"运行中"状态（带 is-active 类）时生效，避免覆盖激活底色
     btn.addEventListener('mouseenter', () => { if (!btn.classList.contains('is-active')) btn.style.background = 'rgba(255,255,255,0.16)'; });
     btn.addEventListener('mouseleave', () => { if (!btn.classList.contains('is-active')) btn.style.background = 'rgba(255,255,255,0.08)'; });
     return { cell: cell, btn: btn, cap: cap };
   }
 
-  const btnScroll = makeBtnCell(ICON_SCROLL_DOWN, '滚动');   // 向下箭头 = 开始滚动
-  const btnMenu   = makeBtnCell('\u2630', '菜单');   // ≡ 菜单
-  const btnPlay   = makeBtnCell('\u25B6', '朗读');   // ▶ 朗读播放/暂停
+  const btnScroll = makeBtnCell(ICON_SCROLL_DOWN, '滚动');
+  const btnMenu   = makeBtnCell('\u2630', '菜单');
+  const btnPlay   = makeBtnCell('\u25B6', '朗读');
 
   // 分隔线（仅展开时可见）
   const divider = document.createElement('div');
@@ -158,7 +157,6 @@
   body.style.cssText = 'display:none;flex-direction:column;gap:12px;padding:12px;box-sizing:border-box;';
   bar.appendChild(body);
 
-  // 通用控件格：控件在上，功能文字在下
   function makeCell(label, control, wide) {
     const c = document.createElement('div');
     c.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:5px;' +
@@ -186,7 +184,6 @@
     return r;
   }
 
-  // 开关（上下文中多处使用，函数声明提升使其可在下方被调用）
   function makeToggle() {
     const pill = document.createElement('div');
     pill.style.cssText = 'width:44px;height:22px;border-radius:22px;background:rgba(148,163,184,0.55);'+
@@ -204,7 +201,7 @@
     pill.__knob.style.transform = on ? 'translateX(22px)' : 'translateX(0)';
   }
 
-  // ---------- 标签页（滚动 / 朗读）：切换直接由第一行底部文字承担，不再新增单独一行按钮 ----------
+  // ---------- 标签页（滚动 / 朗读） ----------
   let activeTab = 'scroll';
   function makePanel() {
     const p = document.createElement('div');
@@ -214,7 +211,6 @@
   }
   const scrollPanel = makePanel();
   const ttsPanel = makePanel();
-  // 高亮：当前激活标签的第一行底部文字变白并加下划线，未激活为淡灰
   function paintTabs() {
     const onTab = (tab) => tab === activeTab;
     btnScroll.cap.style.color = onTab('scroll') ? '#fff' : 'rgba(255,255,255,0.5)';
@@ -227,17 +223,15 @@
     ttsPanel.style.display = onTab('tts') ? 'flex' : 'none';
   }
   function switchTab(key) { if (activeTab === key) return; activeTab = key;
-    if (key === 'tts') { if (scrolling) stopScroll(); }           // 切到朗读页：停滚动，两套功能不串扰
-    else { if (tts.playing) ttsStop(false); }                      // 切到滚动页：停朗读
+    if (key === 'tts') { if (scrolling) stopScroll(); }
+    else { if (tts.playing) ttsStop(false); }
     paintTabs(); try { localStorage.setItem(TAB_STORAGE_KEY + location.hostname, key); } catch (e) {} }
-  // 把第一行底部文字（滚动 / 朗读）做成可点击的标签切换入口；点击文字=切页，点击图标按钮仍执行原动作
   btnScroll.cap.setAttribute('data-nodrag', 'true');
   btnPlay.cap.setAttribute('data-nodrag', 'true');
   btnScroll.cap.style.cursor = 'pointer';
   btnPlay.cap.style.cursor = 'pointer';
   btnScroll.cap.addEventListener('click', (e) => { e.stopPropagation(); switchTab('scroll'); });
   btnPlay.cap.addEventListener('click', (e) => { e.stopPropagation(); switchTab('tts'); });
-  // hover 反馈：未激活标签在鼠标经过时给出底色，提示整块（含内边距）均可点击切换
   btnScroll.cap.addEventListener('mouseenter', () => { if (activeTab !== 'scroll') btnScroll.cap.style.background = 'rgba(255,255,255,0.08)'; });
   btnScroll.cap.addEventListener('mouseleave', () => paintTabs());
   btnPlay.cap.addEventListener('mouseenter', () => { if (activeTab !== 'tts') btnPlay.cap.style.background = 'rgba(255,255,255,0.08)'; });
@@ -258,22 +252,18 @@
     'border:1px solid rgba(255,255,255,0.22);background:#1c1c26;color:#fff;'+
     'font-size:11px;outline:none;box-sizing:border-box;padding:0 4px;color-scheme:dark;';
   row2.appendChild(makeCell('语音音色', ttsVoiceSel));
-  // 修复：第二行"朗读语速/语音音色"两行说明文字基线未对齐 —— 数字框与下拉框实际渲染高度略有差异，
-  // 在 align-items:flex-start(顶部对齐) 下会把各自下方的说明文字顶成一高一低。
-  // 改为底部对齐，使两行说明文字落在同一条基线上，控件顶部观感保持不变。
   row2.style.alignItems = 'flex-end';
 
-  // ---------- 朗读页开关行：空格键切换暂停/播放 + 自动跳转下一页 ----------
+  // ---------- 朗读页开关行 ----------
   const rowTtsToggle = rowFlex(ttsPanel);
   const spaceKeyTtsToggle = makeToggle();
   const autoJumpTtsToggle = makeToggle();
   rowTtsToggle.appendChild(makeCell('空格键朗读', spaceKeyTtsToggle));
   rowTtsToggle.appendChild(makeCell('自动跳转', autoJumpTtsToggle));
   rowTtsToggle.style.alignItems = 'flex-end';
-  // 与滚动页版式一致：开关行置于上方，语速/音色行置于下方
   ttsPanel.insertBefore(rowTtsToggle, row2);
 
-  // ---------- 滚动页：功能开关（空格键 / 自动跳转） ----------
+  // ---------- 滚动页：功能开关 ----------
   const row3 = rowFlex(scrollPanel);
   const spaceKeyToggle = makeToggle();
   const autoJumpToggle = makeToggle();
@@ -313,7 +303,7 @@
   manualJumpBtn.cell = jumpCell;
 
   // ============================================================
-  //  配置面板（自定义选择器 / 手动指定跳转）
+  //  配置面板
   // ============================================================
   const CONFIG_PANEL_WIDTH = 340;
   const configPanel = document.createElement('div');
@@ -388,7 +378,6 @@
       btnRow.style.paddingTop = '8px';
       btnRow.style.height = 'auto';
     } else {
-      // 收起时隐藏播放器长条，改为显示贴边停靠的 ≡ 悬浮按钮
       if (configVisible) closeConfig();
       bar.style.display = 'none';
       miniBtn.style.display = 'flex';
@@ -399,7 +388,6 @@
     try { localStorage.setItem(getExpandStorageKey(), String(expanded)); } catch (e) {}
   }
 
-  // ---------- 展开动效：按钮滑到菜单按钮位置 → 从按钮向左右/向下展开面板 ----------
   let expandCleanupTimer = null;
   function expandFromMini() {
     if (expanded) return;
@@ -408,7 +396,6 @@
     const finalLeft = panelSide === 'left' ? 0 : window.innerWidth - BAR_W;
     const targetLeft = finalLeft + BAR_W / 2 - 20;
     lastYPosition = Math.max(8, mr.top - 8);
-    // 阶段1：悬浮按钮离开边界，滑到面板贴边时菜单按钮所在的位置
     miniBtn.style.transition = 'none';
     miniBtn.style.left = mr.left + 'px'; miniBtn.style.right = 'auto';
     miniBtn.style.borderRadius = '50%';
@@ -422,7 +409,6 @@
     expanded = true;
     miniBtn.style.display = 'none';
     miniBtn.style.transition = '';
-    // 先按展开态渲染（不可见测量），拿到面板最终高度
     bar.style.display = 'block';
     body.style.display = 'flex';
     divider.style.display = 'block';
@@ -436,7 +422,6 @@
     bar.style.overflow = 'hidden';
     const finalH = bar.offsetHeight;
     const finalLeft = panelSide === 'left' ? 0 : window.innerWidth - BAR_W;
-    // 阶段2：以按钮为原点，宽度向左右（直至贴边）、高度向下展开
     bar.style.transition = 'none';
     bar.style.left = (finalLeft + BAR_W / 2 - 20) + 'px'; bar.style.right = 'auto';
     bar.style.top = (lastYPosition + 8) + 'px';
@@ -464,7 +449,7 @@
   }
   function toggleExpand() { expanded = !expanded; applyLayout(); }
   btnMenu.cell.addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(); });
-  // ---------- 鼠标离开展开窗口后自动缩回悬浮条 ----------
+
   let collapseTimer = null;
   function cancelCollapse() { if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; } }
   function scheduleCollapse() {
@@ -483,7 +468,7 @@
   configPanel.addEventListener('mouseleave', scheduleCollapse);
 
   // ============================================================
-  //  位置 / 拖拽（默认右上角，松手吸左/右边）
+  //  位置 / 拖拽
   // ============================================================
   function positionMiniBtn() {
     miniBtn.style.top = (lastYPosition + (BAR_H - 40) / 2) + 'px';
@@ -494,7 +479,6 @@
     const h = bar.offsetHeight || BAR_H;
     lastYPosition = Math.max(8, Math.min(lastYPosition, window.innerHeight - h));
     bar.style.top = lastYPosition + 'px';
-    // 吸附屏幕左/右缘：贴边停靠、圆角朝外（与旧版悬浮面板一致）
     bar.style.borderRadius = panelSide === 'left' ? '0 16px 16px 0' : '16px 0 0 16px';
     if (panelSide === 'left') { bar.style.left = '0px'; bar.style.right = 'auto'; }
     else { bar.style.left = 'auto'; bar.style.right = '0px'; }
@@ -517,7 +501,7 @@
   document.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
     if (!dragMoved && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 4) dragMoved = true;
-    const target = expanded ? bar : miniBtn;   // 收起态拖动的是悬浮按钮本身，需实时跟随鼠标
+    const target = expanded ? bar : miniBtn;
     const x = Math.max(0, Math.min(e.clientX - offX, window.innerWidth - target.offsetWidth));
     lastYPosition = Math.max(8, Math.min(e.clientY - offY, window.innerHeight - target.offsetHeight));
     target.style.left = x + 'px'; target.style.right = 'auto'; target.style.top = lastYPosition + 'px';
@@ -532,9 +516,7 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ side: panelSide, y: lastYPosition })); } catch (e) {}
     positionBar();
   });
-  // ≡ 悬浮按钮：点击后先滑动再展开；拖拽后松手不触发
   miniBtn.addEventListener('click', () => { if (!dragMoved) expandFromMini(); });
-  // 触屏拖拽支持（按钮等控件带 data-nodrag，不受影响；拖背景即可移动悬浮条）
   bar.addEventListener('touchstart', (e) => {
     if (e.target.closest && e.target.closest('[data-nodrag="true"]')) return;
     if (e.touches.length !== 1) return;
@@ -560,7 +542,7 @@
   document.addEventListener('touchend', () => {
     if (!isDragging) return; isDragging = false;
     miniBtn.style.cursor = 'pointer';
-    const wasMiniTap = !expanded && !dragMoved;   // 悬浮按钮上的轻点=展开，拖动=仅换位置
+    const wasMiniTap = !expanded && !dragMoved;
     const rect = (expanded ? bar : miniBtn).getBoundingClientRect();
     panelSide = (rect.left + rect.width / 2) < window.innerWidth / 2 ? 'left' : 'right';
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ side: panelSide, y: lastYPosition })); } catch (e) {}
@@ -578,7 +560,7 @@
   }
   function saveConfig() {
     try { localStorage.setItem(CONFIG_STORAGE_KEY, configTextarea.value); } catch (e) {}
-    cachedRules = null; cachedRulesText = '__invalidated__';  // [FIX P2-8] 保存后立即失效缓存
+    cachedRules = null; cachedRulesText = '__invalidated__';
   }
   function loadDelay() { try { const s = localStorage.getItem(DELAY_STORAGE_KEY); if (s !== null) { const v = parseFloat(s); if (!isNaN(v) && v >= 0 && v <= 10) { delayInput.value = String(Math.round(v * 2) / 2); return; } } } catch (e) {} delayInput.value = '2'; }
   function saveDelay() { try { localStorage.setItem(DELAY_STORAGE_KEY, delayInput.value); } catch (e) {} }
@@ -604,7 +586,6 @@
   autoJumpTtsToggle.addEventListener('click', (e) => { e.stopPropagation(); autoJumpTts().checked = !autoJumpTts().checked; paintToggle(autoJumpTtsToggle, autoJumpTts().checked); saveAutoJumpTts(); });
   manualJumpBtn.cell.addEventListener('click', (e) => { e.stopPropagation(); if (configVisible) closeConfig(); else openConfig(); });
 
-  // 输入框交互
   function bindNumberFocus(el) {
     el.addEventListener('focus', () => { el.style.borderColor = 'rgba(99,102,241,0.6)'; el.style.background = 'rgba(255,255,255,0.1)'; });
     el.addEventListener('blur', () => { el.style.borderColor = 'rgba(255,255,255,0.14)'; el.style.background = 'rgba(255,255,255,0.06)'; });
@@ -625,7 +606,6 @@
       return { pattern: parts[0] || '', selector: parts[1] || '', keyword: parts[2] || '' };
     });
   }
-  // [FIX P2-8] 规则缓存：仅当 textarea 内容发生变化时才重新解析
   function getRules() {
     const txt = configTextarea.value;
     if (cachedRulesText !== txt) {
@@ -644,11 +624,10 @@
   function findNextButtonGeneric() {
     const keywords = ['下一章','下一页','next chapter','下一节','下章','下页','下一话','next_chap','next chap','下一回','下一卷','下一篇','下回','next page','下一章節','下一話','下一頁','下一节','下节','下話','次の章','次へ','다음','다음 장','다음 화','后一章','后一节','后一页'];
     const lcKeywords = keywords.map(k => k.toLowerCase());
-    // 轻量候选：容器内先扫交互/行内标签；div/span/p 仅在候选不足时按需补扫，避免超大页面卡顿
     const candidateTags = 'a, button, [role="button"], input[type="button"], input[type="submit"], li, strong, b, em, i, label, td, th, h1, h2, h3, h4, h5, h6';
     const candidateTagsHeavy = 'div, span, p';
     const semanticContainers = ['nav','article','main','footer','[class*="page"]','[class*="chapter"]','[class*="nav"]','[class*="control"]','[id*="page"]','[id*="chapter"]','[id*="nav"]'];
-    const MAX_CANDIDATES = 1200;   // 候选总量上限，防止极端页面扫描失控
+    const MAX_CANDIDATES = 1200;
     const MIN = 20;
     let elements = []; const seen = new Set();
     const pushAll = (nodes, cap) => { for (const n of nodes) { if (seen.has(n)) continue; seen.add(n); elements.push(n); if (elements.length >= cap) return true; } return false; };
@@ -664,7 +643,6 @@
     }
     if (elements.length < 20) { try { pushAll(document.querySelectorAll('a, button, [role="button"], input[type="button"], input[type="submit"]'), MAX_CANDIDATES); } catch (e) {} }
     if (elements.length < 20) {
-      // 最后兜底才扫 div/span/p，并按最小尺寸提前过滤明显不可能是按钮的小元素
       try {
         const heavy = document.querySelectorAll('div, span, p');
         for (const n of heavy) {
@@ -675,7 +653,6 @@
       } catch (e) {}
     }
 
-    // [FIX P1-7] 两阶段：先按纯文本筛选（不触发布局），再对少量命中做可见性检查
     const textHits = [];
     for (const el of elements) {
       const raw = (el.textContent || el.value || el.title || el.getAttribute('aria-label') || '').toLowerCase();
@@ -718,7 +695,7 @@
     return bestMatch;
   }
   function findNextPageButton() {
-    const rules = getRules();   // [FIX P2-8] 走缓存
+    const rules = getRules();
     const hostname = location.hostname.toLowerCase();
     const matchedRule = rules.find(rule => { if (!rule.pattern) return false; const pattern = rule.pattern.replace(/\*/g, '.*'); try { return new RegExp(pattern, 'i').test(hostname); } catch (e) { return hostname.includes(rule.pattern.replace(/\*/g, '')); } });
     if (matchedRule && matchedRule.selector) { const btn = document.querySelector(matchedRule.selector); if (btn && isElementVisible(btn)) { if (!matchedRule.keyword) return btn; const text = (btn.innerText || btn.textContent || '').toLowerCase(); if (text.includes(matchedRule.keyword.toLowerCase())) return btn; } }
@@ -733,9 +710,9 @@
     const nextBtn = findNextPageButton(); if (!nextBtn) return;
     try { sessionStorage.setItem(SCROLL_STATE_KEY, JSON.stringify({ scrolling: true, speed: speedInput.value, timestamp: Date.now() })); } catch (e) {}
     const delayMs = getDelayMs();
-    const token = ++nextPageToken;   // [FIX P0-3] 代际守卫：任何后续 stop/restart 都会让它作废
+    const token = ++nextPageToken;
     nextPageDelayTimer = setTimeout(() => {
-      if (token !== nextPageToken) return;   // 已被取消或重新触发
+      if (token !== nextPageToken) return;
       nextPageDelayTimer = null;
       cachedNextPageBtn = null;
       const href = nextBtn.getAttribute('href');
@@ -751,10 +728,9 @@
   function startScroll() {
     let speed = parseInt(speedInput.value, 10); if (isNaN(speed) || speed < 1) speed = 1; if (speed > 100) speed = 100;
     liveBaseSpeed = computeBaseSpeed();
-    if (tts.playing) ttsStop(false);            // 互斥：启动滚动前先停朗读，避免朗读态下滚动逻辑/自动跳转被执行
+    if (tts.playing) ttsStop(false);
     scrolling = true; cachedNextPageBtn = null; lastProbeAt = 0;
     if (nextPageDelayTimer) { clearTimeout(nextPageDelayTimer); nextPageDelayTimer = null; }
-    // [FIX P0-1] 自动滚动期间禁用站点自带的平滑滚动，避免逐帧 scrollBy 被动画化导致速度失真/卡死
     if (prevScrollBehavior === null) {
       prevScrollBehavior = document.documentElement.style.scrollBehavior || '';
       document.documentElement.style.scrollBehavior = 'auto';
@@ -765,7 +741,6 @@
     function scrollStep(ts) {
       if (!scrolling) return;
       if (!scrollTimestamp) scrollTimestamp = ts;
-      // [FIX P0-2] delta 封顶 100ms，防止后台标签页恢复时一次性冲出一大段
       const delta = Math.min(ts - scrollTimestamp, 100);
       scrollTimestamp = ts;
       scrollAccumulated += liveBaseSpeed * (delta / 16.67);
@@ -787,10 +762,9 @@
   }
   function stopScroll() {
     scrolling = false; cachedNextPageBtn = null;
-    nextPageToken++;    // [FIX P0-3] 让任何挂起的跳转定时器失效
+    nextPageToken++;
     if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
     if (nextPageDelayTimer) { clearTimeout(nextPageDelayTimer); nextPageDelayTimer = null; }
-    // [FIX P0-1] 恢复站点原有的 scroll-behavior 内联值
     if (prevScrollBehavior !== null) {
       document.documentElement.style.scrollBehavior = prevScrollBehavior;
       prevScrollBehavior = null;
@@ -805,7 +779,6 @@
     } catch (e) {}
   }
 
-  // ---------- 朗读续读恢复：自动跳转后回来则切回朗读页并开始朗读 ----------
   function restoreTtsState() {
     try { const st = JSON.parse(sessionStorage.getItem(TTS_RESUME_KEY));
       if (st && st.resume && Date.now() - st.timestamp < 5 * 60 * 1000) {
@@ -821,7 +794,6 @@
   document.addEventListener('keydown', (e) => {
     if (e.code !== 'Space') return;
     const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-    // 按当前选中标签页路由：朗读页控朗读，滚动页控滚动，互不串扰
     if (activeTab === 'tts') {
       if (!spaceKeyTts().checked) return;
       e.preventDefault(); ttsPauseToggle(); return;
@@ -845,7 +817,38 @@
   function ttsExtractParagraphs() { const root = ttsFindContentRoot(); if (!root) return []; const nodes = root.querySelectorAll('p'); const out = []; const seen = new Set(); if (nodes.length < 3) { const parts = root.innerHTML.replace(/<(script|style|select|textarea)[\s\S]*?<\/\1>/gi, ' ').split(/<br\s*\/?>(?![^<]*<\/p>)/i).map(s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()).filter(s => s.length >= 4 && s.length <= 2000 && !TTS_DROP_LINE.test(s)); parts.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ text: t, elem: root }); } }); return out; } nodes.forEach(p => { if (TTS_NEG_RE.test(p.id + ' ' + p.className)) return; if (p.closest('nav, header, footer, aside, [data-asr-ui]')) return; const t = (p.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length < 4 || t.length > 2000) return; if (TTS_DROP_LINE.test(t)) return; if (ttsLinkDensity(p) > 0.3) return; if (seen.has(t)) return; seen.add(t); out.push({ text: t, elem: p }); }); return out; }
 
   // ---------- 朗读控制 ----------
-  const tts = { texts: [], idx: 0, playing: false, paused: false, voice: null, rate: 2, resumeTimer: null, watchdog: null };
+  // spokenCount：真正进入 onstart 的句子数（用于"读完 vs 失败"判定）
+  // startIdx：本次朗读会话的锚点（由选中决定的起点，或 0）
+  const tts = { texts: [], idx: 0, playing: false, paused: false, voice: null, rate: 2, resumeTimer: null, watchdog: null, spokenCount: 0, startIdx: 0 };
+
+  // 检测页面选中文本对应的段落索引（-1 表示无选中 / 未找到）
+  function findSelectedParagraphIndex() {
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return -1;
+      if (!sel.toString().trim()) return -1;
+      const range = sel.getRangeAt(0);
+      let node = range.startContainer;
+      if (!node) return -1;
+      const startEl = node.nodeType === 1 ? node : node.parentElement;
+      if (!startEl) return -1;
+      for (let i = 0; i < tts.texts.length; i++) {
+        const el = tts.texts[i].elem;
+        if (el && (el === startEl || el.contains(startEl))) return i;
+      }
+      const snippet = sel.toString().replace(/\s+/g, ' ').trim().slice(0, 20);
+      if (snippet) {
+        for (let i = 0; i < tts.texts.length; i++) {
+          const t = tts.texts[i].text || '';
+          if (t.includes(snippet)) return i;
+        }
+      }
+      return -1;
+    } catch (e) {
+      return -1;
+    }
+  }
+
   function paintPlayBtn() { const active = tts.playing && !tts.paused; btnPlay.btn.innerHTML = active ? '\u23F8' : '\u25B6'; if (active) btnPlay.btn.classList.add('is-active'); else btnPlay.btn.classList.remove('is-active'); btnPlay.btn.style.background = active ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'; btnPlay.cap.innerText = active ? '暂停' : '朗读'; }
   let playHintTimer = null;
   function flashPlayHint(msg) {
@@ -854,33 +857,36 @@
     btnPlay.cap.innerText = msg;
     btnPlay.cap.style.color = '#fca5a5';
     btnPlay.btn.style.background = 'rgba(239,68,68,0.28)';
-    // [FIX P1-4] 结束后统一走 paintPlayBtn/paintTabs 恢复状态，避免手动写死颜色覆盖实际激活态
     playHintTimer = setTimeout(() => {
       paintPlayBtn();
       paintTabs();
-    }, 1600);
+    }, 1800);
   }
   function ttsSpeakCurrent() {
     if (!tts.playing || tts.paused) return;
     if (tts.idx >= tts.texts.length) { ttsStop(true); return; }
+    clearTimeout(tts.watchdog);
     const item = tts.texts[tts.idx];
     const u = new SpeechSynthesisUtterance(item.text);
     if (tts.voice) u.voice = tts.voice; u.lang = (tts.voice && tts.voice.lang) || 'zh-CN'; u.rate = tts.rate; u.volume = 1; u.pitch = 1;
-    // 修复"不断重复第一句"：为每一句加一个只推进一次的守卫。
-    // 旧版 watchdog 在正常朗读(>3s)时会 cancel 后立刻 ttsSpeakCurrent()，
-    // 但此时 tts.idx 未前进，于是反复重读同一句；onend 与 watchdog 互相竞争导致卡死。
     let advanced = false, started = false, retryCount = 0;
     const advance = () => { if (advanced) return; advanced = true; clearTimeout(tts.watchdog); tts.idx++; ttsSpeakCurrent(); };
-    u.onstart = () => { started = true; if (item.elem && item.elem.scrollIntoView) { try { item.elem.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} } };
+    u.onstart = () => {
+      started = true;
+      tts.spokenCount++;
+      if (item.elem && item.elem.scrollIntoView) { try { item.elem.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+    };
     u.onend = () => { if (!tts.playing) return; advance(); };
-    u.onerror = (e) => { if (!tts.playing) return; if (e.error === 'canceled' || e.error === 'interrupted') return; advance(); };
-    speechSynthesis.speak(u);
-    clearTimeout(tts.watchdog);
-    // watchdog 仅作"onend 未触发的卡死兜底"：正在朗读时绝不打断重读，交给 onend 推进。
+    u.onerror = (e) => {
+      if (!tts.playing) return;
+      if (e.error === 'canceled' || e.error === 'interrupted') return;
+      advance();
+    };
+    try { speechSynthesis.speak(u); } catch (e) { advance(); return; }
     tts.watchdog = setTimeout(() => {
       if (!tts.playing || tts.paused) return;
-      if (speechSynthesis.speaking || speechSynthesis.pending) return; // 正常朗读中，勿 cancel 重读
-      if (!started && retryCount < 2) { // 这一句从未开始：先换本地音色重试，再原样补读，仍不行才跳过
+      if (speechSynthesis.speaking || speechSynthesis.pending) return;
+      if (!started && retryCount < 2) {
         retryCount++;
         if (retryCount === 1) {
           const vs = speechSynthesis.getVoices(); const fb = vs.find(v => v.localService) || vs[0] || null;
@@ -894,29 +900,105 @@
     }, 3000);
   }
   function ttsStartResumeGuard() { clearInterval(tts.resumeTimer); tts.resumeTimer = setInterval(() => { if (tts.playing && !tts.paused && speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); speechSynthesis.resume(); } }, 8000); }
-  function ttsStart() {
-    if (!tts.texts.length) { tts.texts = ttsExtractParagraphs(); tts.idx = 0; }
-    if (!tts.texts.length) { flashPlayHint('未识别到正文'); return; }
+
+  // 从指定段落重新开始朗读
+  function ttsRestartFrom(idx) {
+    tts.idx = idx;
+    tts.spokenCount = 0;
+    clearTimeout(tts.watchdog);
     try { speechSynthesis.cancel(); } catch (e) {}
-    if (scrolling) stopScroll();                // 互斥：启动朗读前先停滚动，杜绝朗读态残留滚动自动跳转
-    tts.playing = true; tts.paused = false; ttsStartResumeGuard(); paintPlayBtn();
-    // cancel() 后立即 speak 偶发被 Chrome 吞掉第一句，延迟 60ms 再开播
+    tts.paused = false;
+    ttsStartResumeGuard();
+    paintPlayBtn();
     setTimeout(() => { if (tts.playing && !tts.paused) ttsSpeakCurrent(); }, 60);
   }
-  function ttsPauseToggle() { if (!tts.playing) { ttsStart(); return; } if (tts.paused) { speechSynthesis.resume(); tts.paused = false; } else { speechSynthesis.pause(); tts.paused = true; } paintPlayBtn(); }
-  function ttsStop(finished) { tts.playing = false; tts.paused = false; clearInterval(tts.resumeTimer); clearTimeout(tts.watchdog); speechSynthesis.cancel(); paintPlayBtn(); if (finished) { tts.texts = []; tts.idx = 0; if (autoJumpTts().checked) tryAutoNextPageTts(); } }
-  // 朗读专用自动跳转：写独立续读标记，跳过去后自动切回朗读页并恢复朗读；不触碰滚动恢复标记
+
+  function ttsStart() {
+    if (!tts.texts.length) {
+      // 首次提取正文：从选中处（如有）或从头开始
+      tts.texts = ttsExtractParagraphs();
+      tts.idx = 0;
+      tts.spokenCount = 0;
+      const selIdx = findSelectedParagraphIndex();
+      if (selIdx >= 0) tts.idx = selIdx;
+      tts.startIdx = tts.idx;
+    } else {
+      // texts 已存在（切标签 / 开滚动等触发 ttsStop(false) 后再点朗读）
+      // 有选中 → 从选中处；无选中 → 保持 idx 从中断处继续
+      const selIdx = findSelectedParagraphIndex();
+      if (selIdx >= 0) {
+        tts.idx = selIdx;
+        tts.startIdx = selIdx;
+        tts.spokenCount = 0;
+      }
+    }
+    if (!tts.texts.length) { flashPlayHint('未识别到正文'); return; }
+    try { speechSynthesis.cancel(); } catch (e) {}
+    if (scrolling) stopScroll();
+    tts.playing = true; tts.paused = false; ttsStartResumeGuard(); paintPlayBtn();
+    setTimeout(() => { if (tts.playing && !tts.paused) ttsSpeakCurrent(); }, 60);
+  }
+  /**
+   * 朗读播放/暂停/恢复切换。
+   *
+   * 恢复规则（只看恢复那一刻的页面选中状态）：
+   *   有选中文本且能定位到段落 → 从选中处重新开始；
+   *   否则                     → 从中断处继续（speechSynthesis.resume）。
+   */
+  function ttsPauseToggle() {
+    if (!tts.playing) { ttsStart(); return; }
+    if (tts.paused) {
+      const selIdx = findSelectedParagraphIndex();
+      if (selIdx >= 0) {
+        // 有选中 → 从选中处重新开始
+        tts.startIdx = selIdx;
+        ttsRestartFrom(selIdx);
+        return;
+      }
+      // 无选中 → 从中断处继续
+      speechSynthesis.resume();
+      tts.paused = false;
+    } else {
+      speechSynthesis.pause();
+      tts.paused = true;
+    }
+    paintPlayBtn();
+  }
+  /**
+   * 停止朗读。
+   * @param {boolean} finished true 表示"流程跑到末尾"，需按比例判定是否算作"读完"并可能触发自动跳转；false 表示状态切换（切标签/开滚动）。
+   * @param {boolean} skipJump true 表示无论如何都不跳转。
+   */
+  function ttsStop(finished, skipJump) {
+    tts.playing = false; tts.paused = false;
+    clearInterval(tts.resumeTimer);
+    clearTimeout(tts.watchdog);
+    try { speechSynthesis.cancel(); } catch (e) {}
+    paintPlayBtn();
+    if (finished) {
+      const spoken = tts.spokenCount;
+      const total = tts.texts.length;
+      // 预期应读段数 = total - startIdx（从选中/中断处开始时，不因分母过大而误判）
+      const expected = total - (tts.startIdx || 0);
+      const actuallySpoken = spoken > 0 && expected > 0 && spoken >= Math.ceil(expected * 0.8);
+      tts.texts = []; tts.idx = 0; tts.spokenCount = 0; tts.startIdx = 0;
+      if (skipJump) return;
+      if (!actuallySpoken) {
+        if (autoJumpTts().checked) flashPlayHint('朗读失败 已停止跳转');
+        return;
+      }
+      if (autoJumpTts().checked) tryAutoNextPageTts();
+    }
+  }
   function tryAutoNextPageTts() {
     const nextBtn = findNextPageButton(); if (!nextBtn) return;
     try { sessionStorage.setItem(TTS_RESUME_KEY, JSON.stringify({ resume: true, timestamp: Date.now() })); } catch (e) {}
-    // 正文读完立即跳转，不再等待"跳转延迟"
     cachedNextPageBtn = null;
     const href = nextBtn.getAttribute('href');
     if (nextBtn.tagName === 'A' && isSafeHref(href)) location.href = nextBtn.href; else nextBtn.click();
   }
+  // 朗读按钮：单击 = 播放 / 暂停 / 恢复
   btnPlay.cell.addEventListener('click', (e) => { e.stopPropagation(); ttsPauseToggle(); });
-  // 朗读中按 停止(方块) 也可停：双击朗读按钮 = 停止
-  btnPlay.btn.addEventListener('dblclick', (e) => { e.stopPropagation(); ttsStop(true); });
 
   function ttsPickVoice(vs) { const zh = vs.filter(v => /^zh([-_]|$)/i.test(v.lang)); const localZh = zh.filter(v => v.localService); return localZh.find(v => /xiaoxiao|xiaoyi|yunjian|hui|han|mei|ting/i.test(v.name)) || localZh[0] || zh.find(v => !/google|online|network/i.test(v.name)) || zh[0] || vs.find(v => v.localService) || vs[0] || null; }
   function ttsLoadVoices() {
@@ -927,7 +1009,6 @@
       const o = document.createElement('option');
       o.value = String(i);
       const fullLabel = (v.localService ? '[本地] ' : '[在线] ') + v.name + ' (' + v.lang + ')';
-      // [FIX P2-6] 用 Array.from 按 Unicode 码点截断，避免半个中文字符 / emoji 被切开
       const nameChars = Array.from(v.name);
       const shortName = nameChars.length > 12 ? nameChars.slice(0, 11).join('') + '\u2026' : v.name;
       o.textContent = (v.localService ? '本·' : '网·') + shortName;
@@ -939,17 +1020,12 @@
     const zi = vs.indexOf(tts.voice); if (zi >= 0) ttsVoiceSel.value = String(zi);
   }
   function ttsWarmUp() {
-    // 修复：不再 speak 音量0的静音 utterance 来'解锁'引擎。
-    // 该静音 utterance 在部分 Chrome 下会长时间停留在 speaking/pending 不结束，
-    // 占用语音队列，导致用户随后点击朗读时真正的语音被排在它后面发不出声（点了没反应）。
     try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.getVoices(); } catch (e) {}
   }
-  // 调整语速不打断当前句：仅保存设置，新语速从下一句话开始生效
   ttsRateInput.addEventListener('change', () => { let v = parseFloat(ttsRateInput.value); if (isNaN(v)) v = 2; tts.rate = Math.min(5, Math.max(0.5, v)); ttsRateInput.value = String(tts.rate); saveTtsRate(); });
   ttsVoiceSel.addEventListener('change', () => { const vs = speechSynthesis.getVoices(); const i = parseInt(ttsVoiceSel.value, 10); if (vs[i]) { tts.voice = vs[i]; try { localStorage.setItem(VOICE_STORAGE_KEY + location.hostname, vs[i].voiceURI || vs[i].name); } catch (e) {} if (tts.playing && !tts.paused) { speechSynthesis.cancel(); ttsSpeakCurrent(); } else { const u = new SpeechSynthesisUtterance('你好，这是朗读音色测试。'); if (tts.voice) u.voice = tts.voice; u.lang = (tts.voice && tts.voice.lang) || 'zh-CN'; u.rate = tts.rate; u.volume = 1; speechSynthesis.speak(u); } } });
   if (typeof speechSynthesis !== 'undefined') {
     ttsLoadVoices();
-    // [FIX P2-5] 用 addEventListener 替代 onvoiceschanged =，避免覆盖同页其他脚本的监听
     try { speechSynthesis.addEventListener('voiceschanged', () => { ttsLoadVoices(); ttsWarmUp(); }); }
     catch (e) { speechSynthesis.onvoiceschanged = () => { ttsLoadVoices(); ttsWarmUp(); }; }
   }
