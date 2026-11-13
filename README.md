@@ -8,58 +8,29 @@
 
 一个轻量、高效的浏览器油猴脚本（Tampermonkey / Violentmonkey），专为网页阅读场景设计。支持自动滚动、智能翻页、整章朗读、从选中处朗读与阅读辅助，适用于长页面浏览、连续阅读、护眼听读等多种场景，并支持浏览器直接打开的纯文本页（`.txt` / `.log` / `.md` / 代码文件等）朗读。
 
-![version](https://img.shields.io/badge/version-3.2.1-blue)
+![version](https://img.shields.io/badge/version-3.3.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
 
 ### 🆕 最新更新
 
-#### v3.2.1 · 选中朗读兼容性修复 + 默认语速 3
-- **修复 `<br>` 分段页面选中朗读失效**：贴吧、知乎回答、V2EX、简书等用 `<br>` 或换行分段的页面，选中文本后朗读**不再永远从第一段开始**，能正确定位到选中段落
-- 修复机制：`ttsExtractParagraphs` 重构为 `<p>` 分支 + `<br>` 分支（记录字符偏移），`findSelectedParagraphIndex` 新增"共享 root 偏移反查"和"短片段兜底"
-- 纯文本页面（`.txt` / `.md` / 代码文件）同样支持偏移定位
-- **默认朗读语速改为 3**（原为 2），已保存的语速设置不受影响
+#### v3.3.0 · 面板与交互全面升级
+- **新增卫星按钮**：鼠标悬停 ≡ 悬浮按钮时，上下分离出朗读 / 滚动卫星按钮。等大、中心距 46px，点击直接启停，鼠标离开自然消失。
+- **新增面板弹性动画**：展开/收起采用单阶段 0.52s `cubic-bezier(0.34,1.56,0.64,1)` 弹性曲线。收起后半段面板淡出、悬浮按钮提前淡入交叉交接，消除突兀感。
+- **悬浮按钮悬停变圆**：吸附态为贴边半圆，鼠标悬停时弹性变圆，拖拽期间保持圆型。
+- **标签页联动**：点击滚动/朗读按钮时，自动切换到对应的标签页。
+- **选中朗读与续读修复**：修复 `<br>` 分段页面（如贴吧、知乎回答）选中朗读永远从第一段开始的问题；纯文本页（`.txt`/代码文件）支持偏移定位。默认朗读语速改为 3。
 
-#### v3.2 · 纯文本页面支持
-- 浏览器直接打开的 `.txt` / `.log` / `.md` / `.csv` / 代码文件（`.py` / `.js` / `.json` 等）现在可以**正常朗读**
-- 按 MIME 类型 + URL 后缀双重判定，**不干扰**正常网页的正文识别
-- 支持 `file://` 本地文件（需在油猴管理器里开启"允许访问文件 URL"）
-- 超长无换行段落自动按句末标点二次切分，避免朗读卡顿
+#### v3.2.1 · 选中朗读修复（已包含在 v3.3.0 中）
+- 修复 `<br>` 分段页面的选中定位问题；纯文本页支持偏移定位；默认朗读语速改为 3。
 
-#### v3.1 · 朗读体验增强
-- **从选中处朗读**：页面有选中文本时，从选中段落开始
-- **暂停续读**：恢复时有选中文本则从选中处重读，无选中则从中断位置继续
-- **朗读失败保护**：引擎报错或识别失败时**不再触发自动跳转**
-- **滚动平滑冲突修复**：自动滚动期间临时禁用站点的 `scroll-behavior: smooth`
-- **探测性能优化**：文本匹配与可见性校验分两阶段执行
+#### v3.0.4 · 本地文件、纯文本页面支持
+- 浏览器直接打开的 `.txt` / `.log` / `.md` / `.csv` / 代码文件可正常朗读；支持 `file://` 本地文件。
+
+#### v3.0.3 · 朗读体验修复
+- 修复朗读失败误跳页、暂停续读回到起点、滚动平滑冲突。
 
 👉 完整版本历史见文末 [更新日志](#-完整更新日志)
-
-### 🎯 适用场景
-
-| 场景 | 典型平台 / 内容 | 推荐功能 |
-| --- | --- | --- |
-| **网络小说 / 连载文学** | 起点、番茄、笔趣阁、晋江、纵横等 | 自动滚动 + 读完整章自动续读 |
-| **漫画 / 条漫** | 哔哩哔哩漫画、快看、腾讯动漫等长图页面 | 长图连续滚动，避免手动翻页 |
-| **学术论文 / 技术文档** | arXiv、PubMed Central、IEEE Xplore、ar5iv、MDN、官方 API 文档 | 长文匀速滚动；选中摘要或章节即可朗读 |
-| **纯文本文件** | 浏览器直接打开的 `.txt` / `.log` / `.md` / `.csv` / 代码文件 | 按行分段朗读；`file://` 本地文件也支持 |
-| **新闻资讯 / 博客文章** | 各大新闻网站、个人博客、Medium、Substack | 一键匀速阅读，解放双手 |
-| **在线课程 / 教程** | 慕课、教程站点、Codecademy 类互动教程 | 边听边记笔记，或边滚动边对照代码 |
-| **论坛帖子 / 社区长文** | 结构清晰的论坛（如 Discourse）；知乎 / 贴吧 / Reddit 等楼层复杂社区**需自定义选择器** | 滚动可用；朗读可能读到用户名、楼层等元信息，详见「已知限制」 |
-| **电子书 / 百科条目** | 维基百科、百科站点、在线电子书阅读器 | 长时间阅读不累眼 |
-| **法律文书 / 合同 / 说明书** | 在线合同、产品说明书、标准文档 | 细节阅读时用朗读辅助校对 |
-| **公众号 / 社交媒体长贴** | 微信公众号文章、微博长文、即刻长文 | 桌面端一键匀速、手机端可听读 |
-| **外语学习材料** | 英文新闻、双语文章、语言学习站点 | 用 TTS 朗读辅助发音和听力练习 |
-| **无障碍 / 护眼场景** | 长时间阅读、视力疲劳、夜间模式 | 朗读代替盯屏，减轻视觉负担 |
-
-### ⚠️ 已知限制
-
-通用脚本无法针对每个站点做定向适配，以下场景可能达不到理想效果：
-
-- **楼层 / 用户信息混杂的社区页**（贴吧、知乎回答、Reddit、V2EX、传统论坛等）：正文识别可能把用户名、发帖时间、"回复/赞/踩"、签名档等元信息也读进去。如遇此情况，可在「自定义下一页选择器」中通过 CSS 选择器指定正文容器（如贴吧 `.d_post_content`、知乎 `.RichText`、V2EX `.topic_content`）。
-- **`<br>` 分段页面的选中朗读**：v3.2.1 已修复"永远从第一段开始"的问题，但若同一段文本在同一页面出现多次，仍可能定位到第一次出现的位置。
-- **动态加载 / Shadow DOM 页面**：部分现代 SPA 用 Shadow DOM 渲染内容，`document.querySelector` 无法穿透，可能识别失败。
-- **公式与图表**：TTS 引擎对数学公式、图表内的文字支持有限，朗读时可能跳过或读得不通顺。
 
 ### ✨ 核心功能
 
@@ -84,22 +55,41 @@
 - 读完自动续读下一章
 - **失败保护**：朗读失败时不会触发自动跳转
 
-#### 纯文本页面支持（v3.2 新增）
+#### 纯文本页面支持
 - 通过 `document.contentType` + URL 后缀双重判定
 - 覆盖扩展名：`txt` `log` `md` `csv` `json` `yaml` `ini` 等文档/配置，以及 `py` `js` `java` `go` `rs` 等代码文件
 - 按换行分段，超长行按句末标点切分
 - 与正常网页的 DOM 启发式识别**完全隔离**
 
-#### 全局适配
-- 适用绝大多数网站
-- 半透明不遮挡正文内容
-- 悬浮按钮吸附屏幕边缘
-- 双标签页模式（滚动 / 朗读分离）
+#### 面板交互
+- 收起态显示 ≡ 悬浮按钮，展开态显示完整面板
+- **鼠标悬停 ≡ 悬浮按钮**：上下分离出卫星按钮；按钮本身弹性变圆
+- **点击卫星按钮**：直接执行对应功能，不展开面板；鼠标离开后自然隐藏
+- **点击 ≡ 悬浮按钮**：弹性展开完整面板
+- **鼠标离开面板**：0.6 秒后弹性收起；收起期间面板淡出，悬浮按钮同步弹性淡入
+- 卫星按钮、面板展开、面板收起、悬浮按钮变圆共用统一弹性曲线，节奏一致
 
 #### 安全与性能
 - 危险协议过滤（javascript:、data: 等）
 - 分层扫描 + 节流策略
 - 长页面稳定流畅
+
+### 🎯 适用场景
+
+| 场景 | 典型平台 / 内容 | 推荐功能 |
+| --- | --- | --- |
+| **网络小说 / 连载文学** | 起点、番茄、笔趣阁、晋江、纵横等 | 自动滚动 + 读完整章自动续读 |
+| **漫画 / 条漫** | 哔哩哔哩漫画、快看、腾讯动漫等长图页面 | 长图连续滚动，避免手动翻页 |
+| **学术论文 / 技术文档** | arXiv、PubMed Central、IEEE Xplore、ar5iv、MDN、官方 API 文档 | 长文匀速滚动；选中摘要或章节即可朗读 |
+| **纯文本文件** | 浏览器直接打开的 `.txt` / `.log` / `.md` / `.csv` / 代码文件 | 按行分段朗读；`file://` 本地文件也支持 |
+| **新闻资讯 / 博客文章** | 各大新闻网站、个人博客、Medium、Substack | 一键匀速阅读，解放双手 |
+| **在线课程 / 教程** | 慕课、教程站点、Codecademy 类互动教程 | 边听边记笔记，或边滚动边对照代码 |
+| **论坛帖子 / 社区长文** | 结构清晰的论坛（如 Discourse）；知乎 / 贴吧 / Reddit 等楼层复杂社区**需自定义选择器** | 滚动可用；朗读可能读到用户名、楼层等元信息，详见「已知限制」 |
+| **电子书 / 百科条目** | 维基百科、百科站点、在线电子书阅读器 | 长时间阅读不累眼 |
+| **法律文书 / 合同 / 说明书** | 在线合同、产品说明书、标准文档 | 细节阅读时用朗读辅助校对 |
+| **公众号 / 社交媒体长贴** | 微信公众号文章、微博长文、即刻长文 | 桌面端一键匀速、手机端可听读 |
+| **外语学习材料** | 英文新闻、双语文章、语言学习站点 | 用 TTS 朗读辅助发音和听力练习 |
+| **无障碍 / 护眼场景** | 长时间阅读、视力疲劳、夜间模式 | 朗读代替盯屏，减轻视觉负担 |
 
 ### 📦 安装
 
@@ -113,14 +103,17 @@
 
 | 操作 | 说明 |
 | --- | --- |
-| 点击 ≡ 悬浮按钮 | 展开控制面板 |
-| 点击 ▶ / ■（滚动页） | 开始 / 停止滚动 |
-| 点击 ▶ / ⏸（朗读页） | 播放 / 暂停 / 恢复朗读 |
-| 先选中正文再点 ▶（朗读页） | 从选中段落开始朗读 |
-| 点击标签文字切换 | 在滚动和朗读之间切换 |
-| 按 `Space` | 当前模式启停（需先开启开关） |
+| 点击 ≡ 悬浮按钮 | 弹性展开完整控制面板 |
+| 悬停 ≡ 悬浮按钮 | 上下分离出朗读 / 滚动卫星按钮；按钮本身弹性变圆 |
+| 点击上方卫星按钮 ▶ / ⏸ | 直接播放 / 暂停朗读（不展开面板，鼠标离开后自动隐藏） |
+| 点击下方卫星按钮 ▶ / ■ | 直接开始 / 停止滚动（不展开面板，鼠标离开后自动隐藏） |
+| 点击面板中滚动按钮 | 切到「滚动」标签页并启停滚动 |
+| 点击面板中朗读按钮 | 切到「朗读」标签页并启停朗读 |
+| 点击底部文字「滚动」/「朗读」 | 单独切换标签页，不触发启停 |
+| 先选中正文再点朗读 | 从选中段落开始朗读 |
+| 按 `Space` | 当前标签页的模式启停（需先开启对应开关） |
 | 拖拽悬浮按钮 | 吸附到左右边缘，自动记忆位置 |
-| 鼠标离开面板 | 0.6 秒后自动缩回 |
+| 鼠标离开面板 | 0.6 秒后弹性收起（面板淡出，悬浮按钮淡入交接） |
 
 **停止朗读的触发方式**：朗读到章末自动结束 / 切换到滚动标签页 / 启动自动滚动。
 
@@ -167,14 +160,14 @@
 - 启发式打分：文本长度、标点密度、链接占比
 - 按 `<p>` 分段；若无 `<p>` 则按 `<br>` / 换行分段
 - 过滤噪声行（上一章、下一章、广告等）
-- 逐段播报时自动滚动到视口中央并高亮（`<br>` 分段页无逐段锚点，跳过滚动跟随）
+- 逐段播报时自动滚动到视口中央并高亮
 
-#### 纯文本页面分流（v3.2）
+#### 纯文本页面分流
 - **判定**：`document.contentType` 命中 `text/plain`、`text/markdown`、`application/json` 等 → 纯文本分支；`text/html` 等明确网页类型直接否决；MIME 缺失时用 URL 后缀兜底
 - **提取**：优先取 `<pre>` 内容，无 `<pre>` 时取 `body.innerText`；按 `\n` 分段，单行 > 500 字时按句末标点二次切分
 - **隔离**：纯文本分支不调用 `ttsFindContentRoot`，不参与 DOM 启发式打分
 
-#### 选中定位（v3.2.1）
+#### 选中定位
 三段式判定，从精确到粗略：
 1. **独立 elem 段落**（`<p>` 分段）：直接 DOM 包含判断
 2. **共享 root 段落**（`<br>` 分段 / 纯文本）：遍历 root 内文本节点累计字符偏移，用偏移落入 `[startOffset, endOffset)` 区间匹配
@@ -182,7 +175,29 @@
 
 使用 `startContainer` 而非 `anchorNode`，从下往上拖选时也能定位到文档顺序靠前的段落。
 
-#### 失败保护（v3.1）
+#### 卫星按钮
+- **触发**：`miniBtn` 的 `mouseenter` 触发 `showSatellites()`，`mouseleave` 启动 400ms 延迟隐藏；卫星按钮自身的 `mouseenter` 会取消延迟
+- **尺寸**：与 ≡ 悬浮按钮等大（40×40，`font-size` 17px）
+- **位置**：上方朗读、下方滚动，中心距 46px，间距 6px
+- **动效**：初始 `opacity: 0` + `scale(0.2)` + `translate(0, ±46px)` 藏在 ≡ 内部 + `blur(4px)`；显示时用 `cubic-bezier(0.34, 1.56, 0.64, 1)` 弹性过渡
+- **点击**：直接执行功能，不展开面板；点击后不主动隐藏，由鼠标离开触发 400ms 延迟隐藏
+
+#### 面板展开/收起动画
+- **统一曲线与时长**：`cubic-bezier(0.34, 1.56, 0.64, 1)` + `520ms`
+- **展开**：从 `miniBtn.getBoundingClientRect()` 实际屏幕位置出发，一次性过渡到面板最终尺寸
+- **收起**：从面板当前 `getBoundingClientRect()` 出发，弹性缩回 miniBtn 位置；面板在后半段淡出，miniBtn 提前淡入并弹性放大，两者交叉过渡，消除突兀感
+- **视觉效果**：曲线 overshoot 产生"从小变大再回弹"的弹簧观感
+
+#### 悬浮按钮悬停变圆
+- 吸附态为贴边半圆（`border-radius: 0 50% 50% 0` 或 `50% 0 0 50%`）
+- 鼠标悬停时通过 `cubic-bezier(0.34, 1.56, 0.64, 1)` + `320ms` 弹性过渡到完整圆（`50%`），鼠标离开恢复半圆
+
+#### 标签联动
+- 点击面板中滚动按钮：若当前不在「滚动」标签，先 `switchTab('scroll')`，再执行启停
+- 点击面板中朗读按钮：若当前不在「朗读」标签，先 `switchTab('tts')`，再执行启停
+- 点击底部文字标签：仅切换标签，不触发启停
+
+#### 失败保护
 - 累计真正进入 `onstart` 的段落数 `spokenCount`
 - 预期段数 = 总段数 − 起始索引
 - `spokenCount ≥ 预期段数 × 80%` 才判定"读完"，否则停止且**不跳转**
@@ -190,6 +205,15 @@
 #### 滚动稳定性
 - 帧间 delta 封顶 100ms，切回后台标签页不会一次冲出大段
 - 自动跳转使用代际 token，任何 `stopScroll` / 重新启动都会使挂起的跳转定时器失效
+
+### ⚠️ 已知限制
+
+通用脚本无法针对每个站点做定向适配，以下场景可能达不到理想效果：
+
+- **楼层 / 用户信息混杂的社区页**（贴吧、知乎回答、Reddit、V2EX、传统论坛等）：正文识别可能把用户名、发帖时间、"回复/赞/踩"、签名档等元信息也读进去。如遇此情况，可在「自定义下一页选择器」中通过 CSS 选择器指定正文容器（如贴吧 `.d_post_content`、知乎 `.RichText`、V2EX `.topic_content`）。
+- **`<br>` 分段页面的选中朗读**：v3.3.0 已修复"永远从第一段开始"的问题，但若同一段文本在同一页面出现多次，仍可能定位到第一次出现的位置。
+- **动态加载 / Shadow DOM 页面**：部分现代 SPA 用 Shadow DOM 渲染内容，`document.querySelector` 无法穿透，可能识别失败。
+- **公式与图表**：TTS 引擎对数学公式、图表内的文字支持有限，朗读时可能跳过或读得不通顺。
 
 ### 📄 许可证
 
@@ -199,9 +223,17 @@ MIT License
 
 | 版本 | 更新内容 |
 | --- | --- |
-| **v3.2.1** | 修复 `<br>` 分段页面选中朗读永远从第一段开始的问题（共享 root 偏移反查 + 短片段兜底）；纯文本页支持偏移定位；默认朗读语速改为 3 |
-| **v3.2** | 新增纯文本页面支持（MIME + URL 后缀分流）；支持 `file://` 本地文件；超长行按句末标点二次切分 |
-| **v3.1** | 新增从选中处朗读、暂停续读、朗读失败保护、滚动平滑冲突修复、探测性能优化 |
+| **v3.3.0** | 累积发布：选中朗读定位修复（`<br>` 分段 / 纯文本偏移定位）、默认语速 3、标签页与按钮联动、卫星按钮悬停分离、面板弹性动画、淡出交接、悬浮按钮悬停变圆 |
+| ~~v3.2.6~~ | （未发布，合并入 v3.3.0）面板收起淡出交接 + 悬浮按钮悬停变圆 |
+| ~~v3.2.5~~ | （未发布，合并入 v3.3.0）卫星按钮鼠标离开消失；面板动画向卫星看齐 |
+| ~~v3.2.4~~ | （未发布，合并入 v3.3.0）卫星按钮尺寸对齐、距离收紧、点击直接启停 |
+| ~~v3.2.3~~ | （未发布，合并入 v3.3.0）卫星按钮悬停分离 |
+| ~~v3.2.2~~ | （未发布，合并入 v3.3.0）标签页与按钮联动 |
+| **v3.2.1** | 修复 `<br>` 分段页面选中朗读永远从第一段开始的问题；纯文本页支持偏移定位；默认朗读语速改为 3 |
+| ~~v3.2~~ | （未发布，内容与 v3.0.4 一致，仅版本号纠正） |
+| ~~v3.1~~ | （未发布，内容与 v3.0.3 一致，仅版本号纠正） |
+| **v3.0.4** | 新增纯文本页面支持（MIME + URL 后缀分流）；支持 `file://` 本地文件；超长行按句末标点二次切分 |
+| **v3.0.3** | 新增从选中处朗读、暂停续读、朗读失败保护、滚动平滑冲突修复、探测性能优化 |
 | **v3.0.2** | 优化代码 |
 | **v3.0.1** | 修复：排版有概率错乱；正文识别加固，短正文识别阈值放宽；有概率吞首句 |
 | **v3.0** | 新增整章朗读/小说朗读、正文智能识别、逐段高亮、音色/语速调节、读完续读 |
@@ -217,58 +249,29 @@ MIT License
 
 A lightweight and efficient userscript (Tampermonkey / Violentmonkey) designed for web reading scenarios. Supports auto-scroll, smart page navigation, full-chapter reading, read-from-selection, and reading assistance — suitable for long-page browsing, continuous reading, eye-friendly listen-reading, and more. Also supports plain-text pages opened directly in the browser (`.txt` / `.log` / `.md` / code files).
 
-![version](https://img.shields.io/badge/version-3.2.1-blue)
+![version](https://img.shields.io/badge/version-3.3.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
 
 ### 🆕 Latest Updates
 
-#### v3.2.1 · Selection-Reading Compatibility Fix + Default Rate 3
-- **Fixed selection-reading failure on `<br>`-separated pages**: Tieba, Zhihu answers, V2EX, Jianshu, and similar pages that split paragraphs with `<br>` or newlines no longer always start reading from the first paragraph — the selected paragraph is now correctly located
-- Mechanism: `ttsExtractParagraphs` was refactored into a `<p>` branch + a `<br>` branch (recording character offsets), and `findSelectedParagraphIndex` now includes "shared-root offset lookup" and "short-snippet fallback"
-- Plain-text pages (`.txt` / `.md` / code files) also support offset-based positioning
-- **Default reading rate changed to 3** (was 2); previously saved rate settings are preserved
+#### v3.3.0 · Comprehensive Panel & Interaction Upgrade
+- **Satellite buttons added**: Hovering the ≡ floating button separates out reading / scrolling satellites above and below. Same size, 46px center distance, click executes directly, hides naturally on mouse leave.
+- **Elastic panel animations**: Expand/collapse use a single-stage 0.52s `cubic-bezier(0.34,1.56,0.64,1)` elastic curve. During collapse, the panel fades out while the floating button fades in and scales up, creating a seamless crossfade.
+- **Floating button rounds on hover**: Docked state is a half-circle against the edge; hovering elastically transforms it into a full circle; stays circular while dragging.
+- **Tab linkage**: Clicking scroll / reading buttons automatically switches to the corresponding tab.
+- **Selection reading & resume fix**: Fixed selection reading always starting from the first paragraph on `<br>`-separated pages (Tieba, Zhihu answers, etc.); offset-based positioning for plain-text pages. Default reading rate changed to 3.
 
-#### v3.2 · Plain-Text Page Support
-- Plain-text pages (`.txt` / `.log` / `.md` / `.csv` / code files like `.py` / `.js` / `.json`) can now be **read aloud normally**
-- Dual detection via MIME type + URL extension, **without interfering** with normal webpage content detection
-- Supports `file://` local files (requires enabling "Allow access to file URLs" in your userscript manager)
-- Long lines without newlines are auto-split at sentence-ending punctuation to avoid reading stutter
+#### v3.2.1 · Selection Reading Fix (included in v3.3.0)
+- Fixed `<br>`-separated pages; offset-based positioning for plain-text; default rate 3.
 
-#### v3.1 · Reading Experience Enhancements
-- **Read from selection**: if text is selected, reading starts from that paragraph
-- **Pause & resume**: on resume, restarts from the selection if one exists; otherwise continues from where it stopped
-- **Reading failure guard**: engine errors or recognition failures **no longer trigger auto-navigation**
-- **Smooth-scroll conflict fix**: temporarily disables the site's `scroll-behavior: smooth` during auto-scroll
-- **Detection performance optimization**: text matching and visibility checks are split into two phases
+#### v3.0.4 · Plain-Text Page Support
+- Plain-text pages (`.txt` / `.log` / `.md` / `.csv` / code files) can be read aloud normally; supports `file://` local files.
+
+#### v3.0.3 · Reading Experience Fixes
+- Fixed false auto-navigation on reading failure, pause-resume restarting from the top, and smooth-scroll conflicts.
 
 👉 Full version history is in the [Changelog](#-full-changelog) at the end.
-
-### 🎯 Use Cases
-
-| Scenario | Typical Sites / Content | Recommended Feature |
-| --- | --- | --- |
-| **Web novels / serialized fiction** | Qidian, Fanqie, Biquge, Jinjiang, Zongheng, etc. | Auto-scroll + auto-continue after finishing a chapter |
-| **Manga / webtoons** | Bilibili Comics, Kuaikan, Tencent Comics, long-image pages | Continuous scroll for long strips, no manual page-turning |
-| **Academic papers / technical docs** | arXiv, PubMed Central, IEEE Xplore, ar5iv, MDN, official API docs | Smooth scroll on long pages; select abstract or a section to read aloud |
-| **Plain-text files** | `.txt` / `.log` / `.md` / `.csv` / code files opened in browser | Line-by-line reading; `file://` local files also supported |
-| **News / blog articles** | Major news sites, personal blogs, Medium, Substack | One-tap smooth reading, hands-free |
-| **Online courses / tutorials** | MOOC platforms, tutorial sites, Codecademy-style interactive tutorials | Listen while taking notes, or scroll alongside code |
-| **Forum posts / community long reads** | Cleanly structured forums (e.g. Discourse); complex thread-based communities like Zhihu / Tieba / Reddit **require custom selectors** | Scrolling works; reading may include usernames and floor metadata — see "Known Limitations" |
-| **E-books / encyclopedia entries** | Wikipedia, wiki sites, online e-book readers | Long reading sessions without eye strain |
-| **Legal documents / contracts / manuals** | Online contracts, product manuals, standards documents | Reading aloud helps with proofreading |
-| **WeChat articles / social media long posts** | WeChat public accounts, Weibo long posts, Jike long posts | One-tap smooth scroll on desktop, listen-reading on mobile |
-| **Foreign-language learning materials** | English news, bilingual articles, language-learning sites | TTS reading for pronunciation and listening practice |
-| **Accessibility / eye-care** | Prolonged reading, visual fatigue, night mode | Reading aloud replaces staring at the screen |
-
-### ⚠️ Known Limitations
-
-A generic userscript cannot be tailored to every site. The following scenarios may not work ideally:
-
-- **Thread-based community pages** (Tieba, Zhihu answers, Reddit, V2EX, traditional forums): content recognition may also read usernames, timestamps, "reply/upvote/downvote" controls, signatures, etc. If this happens, specify the content container via a CSS selector in "Custom next-page selector" (e.g. Tieba `.d_post_content`, Zhihu `.RichText`, V2EX `.topic_content`).
-- **Selection-reading on `<br>`-separated pages**: v3.2.1 fixes the "always starts from the first paragraph" problem, but if the same text appears more than once on the page, it may still anchor to the first occurrence.
-- **Dynamically loaded / Shadow DOM pages**: some modern SPAs render content inside Shadow DOM, which `document.querySelector` cannot traverse; recognition may fail.
-- **Formulas and figures**: TTS engines have limited support for math formulas and text inside figures; reading may skip them or sound unnatural.
 
 ### ✨ Key Features
 
@@ -293,22 +296,41 @@ A generic userscript cannot be tailored to every site. The following scenarios m
 - Auto-continue to next chapter after reading ends
 - **Failure guard**: reading failures will not trigger auto-navigation
 
-#### Plain-Text Page Support (new in v3.2)
+#### Plain-Text Page Support
 - Precise detection via `document.contentType` + URL extension
 - Coverage: documents/config (`.txt` / `.log` / `.md` / `.csv` / `.json` / `.yaml` / `.ini`), code (`.py` / `.js` / `.java` / `.go` / `.rs`), etc.
 - Split by newlines; over-long lines split at sentence-ending punctuation
 - **Fully isolated** from the DOM heuristics for normal web pages
 
-#### Universal Compatibility
-- Works with most websites
-- Semi-transparent UI that doesn't block content
-- Floating button auto-attaches to screen edges
-- Dual-tab mode (Scroll / Reading tabs separated)
+#### Panel Interaction
+- Collapsed state shows a ≡ floating button; expanded state shows the full panel
+- **Hovering the ≡ button**: separates out satellites above and below; the button itself elastically rounds
+- **Clicking a satellite**: executes the function directly, no panel expansion; hides naturally on mouse leave
+- **Clicking ≡**: elastically expands the full panel
+- **Mouse leaving the panel**: elastically collapses after 0.6 seconds; panel fades out while floating button fades in
+- Satellites, panel expand/collapse, and button rounding share the same elastic curve
 
 #### Safety & Performance
 - Dangerous protocol filtering (javascript:, data:, etc.)
 - Layered scanning + throttling strategy
 - Smooth performance on long pages
+
+### 🎯 Use Cases
+
+| Scenario | Typical Sites / Content | Recommended Feature |
+| --- | --- | --- |
+| **Web novels / serialized fiction** | Qidian, Fanqie, Biquge, Jinjiang, Zongheng, etc. | Auto-scroll + auto-continue after finishing a chapter |
+| **Manga / webtoons** | Bilibili Comics, Kuaikan, Tencent Comics, long-image pages | Continuous scroll for long strips, no manual page-turning |
+| **Academic papers / technical docs** | arXiv, PubMed Central, IEEE Xplore, ar5iv, MDN, official API docs | Smooth scroll on long pages; select abstract or a section to read aloud |
+| **Plain-text files** | `.txt` / `.log` / `.md` / `.csv` / code files opened in browser | Line-by-line reading; `file://` local files also supported |
+| **News / blog articles** | Major news sites, personal blogs, Medium, Substack | One-tap smooth reading, hands-free |
+| **Online courses / tutorials** | MOOC platforms, tutorial sites, Codecademy-style interactive tutorials | Listen while taking notes, or scroll alongside code |
+| **Forum posts / community long reads** | Cleanly structured forums (e.g. Discourse); complex thread-based communities like Zhihu / Tieba / Reddit **require custom selectors** | Scrolling works; reading may include usernames and floor metadata — see "Known Limitations" |
+| **E-books / encyclopedia entries** | Wikipedia, wiki sites, online e-book readers | Long reading sessions without eye strain |
+| **Legal documents / contracts / manuals** | Online contracts, product manuals, standards documents | Reading aloud helps with proofreading |
+| **WeChat articles / social media long posts** | WeChat public accounts, Weibo long posts, Jike long posts | One-tap smooth scroll on desktop, listen-reading on mobile |
+| **Foreign-language learning materials** | English news, bilingual articles, language-learning sites | TTS reading for pronunciation and listening practice |
+| **Accessibility / eye-care** | Prolonged reading, visual fatigue, night mode | Reading aloud replaces staring at the screen |
 
 ### 📦 Installation
 
@@ -322,14 +344,17 @@ A generic userscript cannot be tailored to every site. The following scenarios m
 
 | Action | Description |
 | --- | --- |
-| Click ≡ floating button | Expand control panel |
-| Click ▶ / ■ (Scroll tab) | Start / stop scrolling |
-| Click ▶ / ⏸ (Reading tab) | Play / pause / resume reading |
-| Select text, then click ▶ (Reading tab) | Start reading from the selected paragraph |
-| Click tab label | Switch between scroll and reading modes |
-| Press `Space` | Start / stop current mode (toggle required first) |
+| Click ≡ floating button | Elastically expand full control panel |
+| Hover ≡ floating button | Separate out satellites above and below; button elastically rounds |
+| Click top satellite ▶ / ⏸ | Directly play / pause reading (no panel, hides on mouse leave) |
+| Click bottom satellite ▶ / ■ | Directly start / stop scrolling (no panel, hides on mouse leave) |
+| Click panel scroll button | Switch to "Scroll" tab and start / stop scrolling |
+| Click panel reading button | Switch to "Reading" tab and play / pause reading |
+| Click bottom text "滚动" / "朗读" | Switch tabs only, without triggering start/stop |
+| Select text, then click reading | Start reading from the selected paragraph |
+| Press `Space` | Start / stop current tab's mode (toggle required first) |
 | Drag floating button | Attach to screen edge, position auto-saved |
-| Mouse leave panel | Auto-collapse after 0.6 seconds |
+| Mouse leave panel | Elastically collapse after 0.6 seconds (crossfade with button) |
 
 **How reading stops**: automatically at the end of the chapter / switching to the Scroll tab / starting auto-scroll.
 
@@ -376,14 +401,14 @@ Detection is throttled at 600ms intervals; stops when button enters bottom 30% o
 - Heuristic scoring: text length, punctuation density, link ratio
 - Segments by `<p>`; falls back to `<br>` / newline splitting when `<p>` is scarce
 - Filters noise (previous/next chapter, ads, etc.)
-- Auto-scrolls to center of viewport and highlights during segment playback (skipped on `<br>`-separated pages with no per-segment anchors)
+- Auto-scrolls to center of viewport and highlights during segment playback
 
-#### Plain-Text Page Routing (v3.2)
+#### Plain-Text Page Routing
 - **Detection**: `document.contentType` matching `text/plain`, `text/markdown`, `application/json`, etc. → plain-text branch; `text/html` and other explicit web types are rejected; URL extension used as fallback when MIME is missing
 - **Extraction**: prefer `<pre>` content, fall back to `body.innerText`; split by `\n`; lines over 500 characters are re-split at sentence-ending punctuation
 - **Isolation**: the plain-text branch never calls `ttsFindContentRoot` and doesn't participate in DOM heuristic scoring
 
-#### Selection Anchoring (v3.2.1)
+#### Selection Anchoring
 Three-tier lookup, from precise to coarse:
 1. **Per-element paragraphs** (`<p>`-based): direct DOM containment check
 2. **Shared-root paragraphs** (`<br>`-based / plain text): accumulates character offset by walking text nodes in the root, then matches against `[startOffset, endOffset)`
@@ -391,7 +416,29 @@ Three-tier lookup, from precise to coarse:
 
 Uses `startContainer` rather than `anchorNode`, so dragging the selection upward still anchors to the earlier paragraph in document order.
 
-#### Failure Guard (v3.1)
+#### Satellite Buttons
+- **Trigger**: `miniBtn`'s `mouseenter` fires `showSatellites()`; `mouseleave` schedules a 400ms hide. Satellite `mouseenter` cancels the timer
+- **Size**: identical to the ≡ button (40×40, `font-size` 17px)
+- **Position**: reading above, scrolling below; center distance 46px, gap 6px
+- **Animation**: initial `opacity: 0` + `scale(0.2)` + `translate(0, ±46px)` hidden inside ≡ + `blur(4px)`; on show, `cubic-bezier(0.34, 1.56, 0.64, 1)` creates an elastic overshoot
+- **Click**: executes the corresponding function directly; satellites stay visible after a click and hide naturally 400ms after `mouseleave`
+
+#### Panel Expand/Collapse Animation
+- **Unified curve and duration**: `cubic-bezier(0.34, 1.56, 0.64, 1)` + `520ms`
+- **Expand**: starts from `miniBtn.getBoundingClientRect()` (actual screen position), transitions once to the panel's final size
+- **Collapse**: starts from the panel's current `getBoundingClientRect()`, elastically shrinks back to the miniBtn position; the panel fades out in the second half while the miniBtn fades in and scales up, creating a seamless crossfade
+- **Visual effect**: the curve overshoots to ~1.56× the target in mid-animation, creating the "grow larger then settle back" spring feel
+
+#### Floating Button Hover Rounding
+- Docked state is a half-circle against the edge (`border-radius: 0 50% 50% 0` or `50% 0 0 50%`)
+- Hovering applies `cubic-bezier(0.34, 1.56, 0.64, 1)` + `320ms` to transition to a full circle (`50%`); leaving restores the half-circle
+
+#### Tab–Button Linkage
+- Clicking panel's scroll button: if not on "Scroll" tab, `switchTab('scroll')` first, then start/stop
+- Clicking panel's reading button: if not on "Reading" tab, `switchTab('tts')` first, then start/stop
+- Clicking bottom text label: switches tabs only, no start/stop
+
+#### Failure Guard
 - Tracks `spokenCount`, the number of paragraphs that actually fired `onstart`
 - Expected count = total paragraphs − start index
 - "Finished" requires `spokenCount ≥ expected × 80%`; otherwise it is treated as a failure: stop, **no navigation**
@@ -399,6 +446,15 @@ Uses `startContainer` rather than `anchorNode`, so dragging the selection upward
 #### Scroll Stability
 - Inter-frame delta is capped at 100ms, so returning from a background tab doesn't cause a jump
 - Auto-navigation uses a generation token; any `stopScroll` / restart invalidates pending navigation timers
+
+### ⚠️ Known Limitations
+
+A generic userscript cannot be tailored to every site. The following scenarios may not work ideally:
+
+- **Thread-based community pages** (Tieba, Zhihu answers, Reddit, V2EX, traditional forums): content recognition may also read usernames, timestamps, "reply/upvote/downvote" controls, signatures, etc. If this happens, specify the content container via a CSS selector in "Custom next-page selector" (e.g. Tieba `.d_post_content`, Zhihu `.RichText`, V2EX `.topic_content`).
+- **Selection-reading on `<br>`-separated pages**: v3.3.0 fixes the "always starts from the first paragraph" problem, but if the same text appears more than once on the page, it may still anchor to the first occurrence.
+- **Dynamically loaded / Shadow DOM pages**: some modern SPAs render content inside Shadow DOM, which `document.querySelector` cannot traverse; recognition may fail.
+- **Formulas and figures**: TTS engines have limited support for math formulas and text inside figures; reading may skip them or sound unnatural.
 
 ### 📄 License
 
@@ -408,9 +464,17 @@ MIT License
 
 | Version | Updates |
 | --- | --- |
-| **v3.2.1** | Fixed selection-reading always starting from the first paragraph on `<br>`-separated pages (shared-root offset lookup + short-snippet fallback); offset-based positioning for plain-text pages; default reading rate changed to 3 |
-| **v3.2** | Added plain-text page support (routed by MIME + URL extension); supports `file://` local files; over-long lines split at sentence-ending punctuation |
-| **v3.1** | Added read-from-selection, pause & resume, reading failure guard, smooth-scroll conflict fix, detection performance optimizations |
+| **v3.3.0** | Cumulative release: selection reading fix (`<br>`-separated / plain-text offset), default rate 3, tab-button linkage, satellite buttons, elastic panel animations, crossfade, button hover rounding |
+| ~~v3.2.6~~ | (Unreleased, merged into v3.3.0) Panel crossfade + button hover rounding |
+| ~~v3.2.5~~ | (Unreleased, merged into v3.3.0) Satellites hide on mouse leave; panel animations matched to satellites |
+| ~~v3.2.4~~ | (Unreleased, merged into v3.3.0) Satellites matched in size, distance tightened, direct execution |
+| ~~v3.2.3~~ | (Unreleased, merged into v3.3.0) Satellite buttons on hover |
+| ~~v3.2.2~~ | (Unreleased, merged into v3.3.0) Tab-button linkage |
+| **v3.2.1** | Fixed selection-reading always starting from the first paragraph on `<br>`-separated pages; offset-based positioning for plain-text pages; default reading rate changed to 3 |
+| ~~v3.2~~ | (Unreleased, identical to v3.0.4, version number correction only) |
+| ~~v3.1~~ | (Unreleased, identical to v3.0.3, version number correction only) |
+| **v3.0.4** | Added plain-text page support (routed by MIME + URL extension); supports `file://` local files; over-long lines split at sentence-ending punctuation |
+| **v3.0.3** | Added read-from-selection, pause & resume, reading failure guard, smooth-scroll conflict fix, detection performance optimizations |
 | **v3.0.2** | Code optimizations |
 | **v3.0.1** | Fixed: occasional layout glitches; hardened content detection with relaxed threshold for short articles; occasional first-sentence swallowing |
 | **v3.0** | Added full-chapter reading, intelligent content recognition, segment highlighting, voice/speed adjustment, auto-continue |
