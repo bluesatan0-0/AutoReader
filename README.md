@@ -6,7 +6,7 @@
 
 ## 中文
 
-一个轻量、高效的浏览器油猴脚本，专为网页阅读场景设计。支持自动滚动、智能翻页、整章朗读与阅读辅助，特别适合小说、漫画、文章等长内容的连续阅读。
+一个轻量、高效的浏览器油猴脚本（Tampermonkey / Violentmonkey），专为网页阅读场景设计。支持自动滚动、智能翻页、整章朗读、从选中处朗读与阅读辅助，适用于长页面浏览、连续阅读、护眼听读等多种场景。
 
 ![version](https://img.shields.io/badge/version-3.0.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -45,6 +45,22 @@
 - 危险协议过滤（javascript:、data: 等）
 - 分层扫描 + 节流策略
 - 长页面稳定流畅
+
+### 🎯 适用场景
+
+| 场景 | 典型平台 / 内容 | 推荐功能 |
+| --- | --- | --- |
+| **网络小说 / 连载文学** | 起点、番茄、笔趣阁、晋江、纵横等 | 自动滚动 + 读完整章自动续读 |
+| **漫画 / 条漫** | 哔哩哔哩漫画、快看、腾讯动漫等长图页面 | 长图连续滚动，避免手动翻页 |
+| **学术论文 / 技术文档** | arXiv、PubMed Central、IEEE Xplore、ar5iv、MDN、官方 API 文档 | 长文匀速滚动；选中摘要或章节即可朗读 |
+| **新闻资讯 / 博客文章** | 各大新闻网站、个人博客、Medium、Substack | 一键匀速阅读，解放双手 |
+| **在线课程 / 教程** | 慕课、教程站点、Codecademy 类互动教程 | 边听边记笔记，或边滚动边对照代码 |
+| **论坛帖子 / 社区长文** | 知乎、Reddit、V2EX、贴吧、Discourse 论坛 | 长帖浏览，一键滚到底部 |
+| **电子书 / 百科条目** | 维基百科、百科站点、在线电子书阅读器 | 长时间阅读不累眼 |
+| **法律文书 / 合同 / 说明书** | 在线合同、产品说明书、标准文档 | 细节阅读时用朗读辅助校对 |
+| **公众号 / 社交媒体长贴** | 微信公众号文章、微博长文、即刻长文 | 桌面端一键匀速、手机端可听读 |
+| **外语学习材料** | 英文新闻、双语文章、语言学习站点 | 用 TTS 朗读辅助发音和听力练习 |
+| **无障碍 / 护眼场景** | 长时间阅读、视力疲劳、夜间模式 | 朗读代替盯屏，减轻视觉负担 |
 
 ### 📦 安装
 
@@ -147,7 +163,7 @@ MIT License
 
 ## English
 
-A lightweight and efficient Tampermonkey script designed for web reading scenarios. Supports automatic scrolling, intelligent page navigation, full-chapter reading, and reading assistance—particularly suitable for continuous reading of novels, comics, articles, and long-form content.
+A lightweight and efficient userscript (Tampermonkey / Violentmonkey) designed for web reading scenarios. Supports auto-scroll, smart page navigation, full-chapter reading, read-from-selection, and reading assistance — suitable for long-page browsing, continuous reading, eye-friendly listen-reading, and more.
 
 ![version](https://img.shields.io/badge/version-3.0.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -186,6 +202,22 @@ A lightweight and efficient Tampermonkey script designed for web reading scenari
 - Dangerous protocol filtering (javascript:, data:, etc.)
 - Layered scanning + throttling strategy
 - Smooth performance on long pages
+
+### 🎯 Use Cases
+
+| Scenario | Typical Sites / Content | Recommended Feature |
+| --- | --- | --- |
+| **Web novels / serialized fiction** | Qidian, Fanqie, Biquge, Jinjiang, Zongheng, etc. | Auto-scroll + auto-continue after finishing a chapter |
+| **Manga / webtoons** | Bilibili Comics, Kuaikan, Tencent Comics, long-image pages | Continuous scroll for long strips, no manual page-turning |
+| **Academic papers / technical docs** | arXiv, PubMed Central, IEEE Xplore, ar5iv, MDN, official API docs | Smooth scroll on long pages; select abstract or a section to read aloud |
+| **News / blog articles** | Major news sites, personal blogs, Medium, Substack | One-tap smooth reading, hands-free |
+| **Online courses / tutorials** | MOOC platforms, tutorial sites, Codecademy-style interactive tutorials | Listen while taking notes, or scroll alongside code |
+| **Forum posts / community long reads** | Zhihu, Reddit, V2EX, Tieba, Discourse forums | Browse long threads and scroll to the bottom in one tap |
+| **E-books / encyclopedia entries** | Wikipedia, wiki sites, online e-book readers | Long reading sessions without eye strain |
+| **Legal documents / contracts / manuals** | Online contracts, product manuals, standards documents | Reading aloud helps with proofreading |
+| **WeChat articles / social media long posts** | WeChat public accounts, Weibo long posts, Jike long posts | One-tap smooth scroll on desktop, listen-reading on mobile |
+| **Foreign-language learning materials** | English news, bilingual articles, language-learning sites | TTS reading for pronunciation and listening practice |
+| **Accessibility / eye-care** | Prolonged reading, visual fatigue, night mode | Reading aloud replaces staring at the screen |
 
 ### 📦 Installation
 
