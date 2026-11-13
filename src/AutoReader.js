@@ -3,9 +3,10 @@
 // @namespace       https://github.com/bluesatan0-0/AutoReader
 // @homepageURL     https://github.com/bluesatan0-0/AutoReader
 // @supportURL      https://github.com/bluesatan0-0/AutoReader/issues
-// @version 3.0.3
-// @description  网页自动滚动 + 智能翻页 + 小说漫画朗读助手：支持自动滚动、下一页/下一章识别、整章朗读、语速/音色调节和长页面阅读辅助、新增从选中处开始朗读。
+// @version 3.0.4
+// @description  网页自动滚动 + 智能翻页 + 小说/漫画/论文/文章朗读助手：支持匀速滚动、下一页/下一章识别、整章朗读、从选中处朗读、暂停续读、语速/音色调节，并支持浏览器直接打开的纯文本页（.txt/.log/.md/.py 等）朗读。
 // @match        *://*/*
+// @match        file:///*
 // @grant        none
 // @author       bluesatan
 // @date         2026.11.13
@@ -810,11 +811,98 @@
   const TTS_POS_RE = /content|article|chapter|text|main|read|post|novel|book|showtxt|cont|view|story|nr\b/i;
   const TTS_DROP_LINE = /上一章|下一章|上一页|下一页|返回目录|章节目录|加入书签|加入书架|投推荐票|我要报错|手机阅读|手机用户|最新网址|请记住|未完待续|本章完|笔趣阁|小说网|免费阅读|全文字|无弹窗|更新最快|作者：|作者:|字数：|点击|下载|朗读语速|语音音色|空格键朗读|空格键滚动|自定义下一页选择器|跳转延迟|自动跳转/i;
   const TTS_CONTAINER_SELS = ['#chaptercontent','#htmlContent','#contentdetail','#BookText','#nr1','#text','#booktxt','#chapterbody','#content_text','#content1','#articleContent','#con','#mlfy_main_text','.showtxt','.readcontent','.read-content','.chapter-content','.novelcontent','article','#content','.content','main'];
+
+  // ---------- 纯文本页面识别（按 MIME + URL 后缀分流，不扰动 DOM 启发式） ----------
+  const PLAIN_TEXT_EXTS = new Set([
+    // 文档 / 数据
+    'txt','text','log','md','markdown','rst','csv','tsv',
+    // 配置
+    'ini','conf','cfg','properties','env','toml','yaml','yml',
+    // 代码（浏览器直接打开时通常以 text/plain 呈现）
+    'js','mjs','cjs','ts','tsx','jsx','py','java','c','cc','cpp','cxx','h','hpp','cs','go','rs','rb','php',
+    'sh','bash','zsh','fish','ps1','bat','cmd','sql','pl','lua','r','kt','swift','scala','dart',
+    // 结构化文本
+    'json','jsonc','json5','xml'
+  ]);
+
+  function isPlainTextPage() {
+    try {
+      const ct = (document.contentType || '').toLowerCase().split(';')[0].trim();
+      if (ct) {
+        // 明确是纯文本类
+        if (ct === 'text/plain') return true;
+        if (ct === 'text/markdown' || ct === 'text/x-markdown') return true;
+        if (ct === 'text/csv' || ct === 'text/tab-separated-values') return true;
+        if (ct === 'application/json' || ct === 'application/xml' || ct === 'text/xml') return true;
+        // 明确不是纯文本类，直接否定，避免 html / svg / 二进制被误判
+        if (ct === 'text/html' || ct === 'application/xhtml+xml') return false;
+        if (/^(image|audio|video|font)\//.test(ct)) return false;
+        if (ct === 'application/pdf') return false;
+      }
+      // MIME 缺失或未命中时，用 URL 后缀兜底
+      const path = (location.pathname || '').toLowerCase().split('#')[0].split('?')[0];
+      const m = path.match(/\.([a-z0-9]+)$/);
+      if (m && PLAIN_TEXT_EXTS.has(m[1])) return true;
+    } catch (e) {}
+    return false;
+  }
+
   function ttsLinkDensity(el) { const l = el.querySelectorAll('a'); if (!l.length) return 0; let s = 0; l.forEach(a => s += (a.innerText || '').length); return s / Math.max(1, (el.innerText || '').length); }
   function ttsPunctRatio(text) { const han = text.match(/[一-龥]/g); if (!han || han.length < 30) return 0; const p = text.match(/[。！？；，、：,.;:!?]/g); return p ? p.length / han.length : 0; }
   function ttsScoreBlock(el) { if (!(el instanceof HTMLElement)) return 0; if (TTS_NEG_RE.test(el.id + ' ' + el.className)) return 0; if (el.closest('nav, header, footer, aside, form, [data-asr-ui], script, style')) return 0; const text = (el.textContent || '').replace(/\s+/g, ''); if (text.length < 200) return 0; if (ttsLinkDensity(el) > 0.25) return 0; const pr = ttsPunctRatio(text); if (pr < 0.02) return 0; let score = Math.min(text.length, 8000); if (TTS_POS_RE.test(el.id + ' ' + el.className)) score *= 1.5; score *= (0.5 + Math.min(pr, 0.25) * 2); score += el.querySelectorAll('p').length * 20; return score; }
   function ttsFindContentRoot() { for (const s of TTS_CONTAINER_SELS) { const el = document.querySelector(s); if (!el) continue; const text = (el.textContent || '').replace(/\s+/g, ''); if (text.length > 200 && ttsLinkDensity(el) < 0.25 && ttsPunctRatio(text) > 0.02) return el; } let best = null, bestScore = 0; document.querySelectorAll('body div, body section').forEach(el => { const sc = ttsScoreBlock(el); if (sc > bestScore) { bestScore = sc; best = el; } }); return best; }
-  function ttsExtractParagraphs() { const root = ttsFindContentRoot(); if (!root) return []; const nodes = root.querySelectorAll('p'); const out = []; const seen = new Set(); if (nodes.length < 3) { const parts = root.innerHTML.replace(/<(script|style|select|textarea)[\s\S]*?<\/\1>/gi, ' ').split(/<br\s*\/?>(?![^<]*<\/p>)/i).map(s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()).filter(s => s.length >= 4 && s.length <= 2000 && !TTS_DROP_LINE.test(s)); parts.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ text: t, elem: root }); } }); return out; } nodes.forEach(p => { if (TTS_NEG_RE.test(p.id + ' ' + p.className)) return; if (p.closest('nav, header, footer, aside, [data-asr-ui]')) return; const t = (p.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length < 4 || t.length > 2000) return; if (TTS_DROP_LINE.test(t)) return; if (ttsLinkDensity(p) > 0.3) return; if (seen.has(t)) return; seen.add(t); out.push({ text: t, elem: p }); }); return out; }
+
+  // 纯文本页面专用提取：优先取 <pre>，否则取 body.innerText；按换行分段，超长行按句末标点二次切分
+  function ttsExtractPlainText() {
+    const out = []; const seen = new Set();
+    const pushOne = (t) => {
+      t = t.replace(/\s+/g, ' ').trim();
+      if (t.length < 4) return;
+      if (TTS_DROP_LINE.test(t)) return;
+      if (seen.has(t)) return;
+      seen.add(t);
+      out.push({ text: t, elem: null });   // elem 为 null：纯文本页无逐段锚点，不做滚动跟随
+    };
+
+    let raw = '';
+    const pres = document.querySelectorAll('body pre');
+    if (pres.length === 1) {
+      raw = pres[0].textContent || '';
+    } else if (pres.length > 1) {
+      // 多个 <pre> 时取文本量最大的（避免导航栏 / 侧栏中的小 pre）
+      let best = null, bestLen = 0;
+      for (const p of pres) {
+        if (p.closest('[data-asr-ui]')) continue;
+        const len = (p.textContent || '').length;
+        if (len > bestLen) { bestLen = len; best = p; }
+      }
+      raw = (best && best.textContent) || '';
+    }
+    if (!raw.trim()) raw = (document.body && document.body.innerText) || '';
+    raw = raw.replace(/\r\n?/g, '\n');
+
+    // 单行超过 500 字时按句末标点切分，保证每段不至于过长导致朗读卡顿
+    const MAX_LINE = 500;
+    const MIN_SEG = 100;
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      if (line.length <= MAX_LINE) { pushOne(line); continue; }
+      let buf = '';
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        buf += ch;
+        if ((/[。！？!?.;；]/.test(ch) && buf.length >= MIN_SEG) || buf.length >= 300) {
+          pushOne(buf); buf = '';
+        }
+      }
+      if (buf.trim()) pushOne(buf);
+    }
+    return out;
+  }
+
+  function ttsExtractParagraphs() {
+    if (isPlainTextPage()) return ttsExtractPlainText();   // [NEW] 纯文本分流，原逻辑不变
+    const root = ttsFindContentRoot(); if (!root) return []; const nodes = root.querySelectorAll('p'); const out = []; const seen = new Set(); if (nodes.length < 3) { const parts = root.innerHTML.replace(/<(script|style|select|textarea)[\s\S]*?<\/\1>/gi, ' ').split(/<br\s*\/?>(?![^<]*<\/p>)/i).map(s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()).filter(s => s.length >= 4 && s.length <= 2000 && !TTS_DROP_LINE.test(s)); parts.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ text: t, elem: root }); } }); return out; } nodes.forEach(p => { if (TTS_NEG_RE.test(p.id + ' ' + p.className)) return; if (p.closest('nav, header, footer, aside, [data-asr-ui]')) return; const t = (p.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length < 4 || t.length > 2000) return; if (TTS_DROP_LINE.test(t)) return; if (ttsLinkDensity(p) > 0.3) return; if (seen.has(t)) return; seen.add(t); out.push({ text: t, elem: p }); }); return out; }
 
   // ---------- 朗读控制 ----------
   // spokenCount：真正进入 onstart 的句子数（用于"读完 vs 失败"判定）
