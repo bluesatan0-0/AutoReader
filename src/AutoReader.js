@@ -3,13 +3,13 @@
 // @namespace       https://github.com/bluesatan0-0/AutoReader
 // @homepageURL     https://github.com/bluesatan0-0/AutoReader
 // @supportURL      https://github.com/bluesatan0-0/AutoReader/issues
-// @version 3.2.1
-// @description  网页自动滚动 + 智能翻页 + 小说/漫画/论文/文章朗读助手：支持匀速滚动、下一页/下一章识别、整章朗读、从选中处朗读、暂停续读、语速/音色调节，支持纯文本页（.txt/.md/代码文件）朗读。默认朗读语速 3。
+// @version 3.3.0
+// @description  网页自动滚动 + 智能翻页 + 小说/漫画/论文/文章朗读助手：支持匀速滚动、下一页/下一章识别、整章朗读、从选中处朗读、暂停续读、语速/音色调节，支持纯文本页朗读。悬停悬浮按钮可上下分离出等大朗读/滚动卫星按钮，点击直接启停。默认朗读语速 3。
 // @match        *://*/*
 // @match        file:///*
 // @grant        none
 // @author       bluesatan
-// @date         2026.11.13
+// @date         2026.11.14
 // @license      MIT license
 // @downloadURL https://update.greasyfork.org/scripts/590642/AutoReader.user.js
 // @updateURL https://update.greasyfork.org/scripts/590642/AutoReader.meta.js
@@ -35,6 +35,11 @@
   const BAR_W = 236;
   const BAR_H = 56;
   const VIEWPORT_BOTTOM_THRESHOLD = 0.30;
+
+  // 统一的弹性动画曲线与时长，卫星按钮、面板展开、面板收起、悬浮按钮变圆共用
+  const ELASTIC_EASING = 'cubic-bezier(0.34,1.56,0.64,1)';
+  const ELASTIC_DURATION = 520;
+  const MINI_RADIUS_DURATION = 320;
 
   // ---------- 存储键 ----------
   const STORAGE_KEY = 'autoScrollPanel_v4_viewport';
@@ -105,11 +110,145 @@
     'background:rgba(22,22,28,0.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);'+
     'border:1px solid rgba(255,255,255,0.14);'+
     'box-shadow:0 10px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.08);'+
-    'user-select:none;-webkit-user-select:none;touch-action:none;';
-  miniBtn.addEventListener('mouseenter', () => { if (!isDragging) miniBtn.style.background = 'rgba(40,40,50,0.85)'; });
-  miniBtn.addEventListener('mouseleave', () => { miniBtn.style.background = 'rgba(22,22,28,0.72)'; });
+    'user-select:none;-webkit-user-select:none;touch-action:none;'+
+    'transition:background 0.18s ease, border-radius ' + (MINI_RADIUS_DURATION / 1000) + 's ' + ELASTIC_EASING + ';';
   document.body.appendChild(miniBtn);
 
+  // ============================================================
+  //  卫星按钮（与悬浮按钮等大；悬停分离；点击直接启停；鼠标离开才隐藏）
+  // ============================================================
+  const satWrapper = document.createElement('div');
+  satWrapper.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:999998;pointer-events:none;';
+  document.body.appendChild(satWrapper);
+
+  function makeSatellite() {
+    const s = document.createElement('div');
+    s.style.cssText =
+      'position:absolute;width:40px;height:40px;display:flex;align-items:center;justify-content:center;'+
+      'cursor:pointer;color:#fff;font-size:17px;line-height:1;border-radius:50%;'+
+      'background:rgba(22,22,28,0.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);'+
+      'border:1px solid rgba(255,255,255,0.14);'+
+      'box-shadow:0 6px 24px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08);'+
+      'user-select:none;-webkit-user-select:none;pointer-events:none;opacity:0;'+
+      'transition:opacity 0.18s ease, transform 0.52s ' + ELASTIC_EASING + ', filter 0.32s ease, background 0.18s ease;'+
+      'filter:blur(4px);will-change:transform,opacity,filter;transform-origin:center center;';
+    s.setAttribute('data-asr-ui', '1');
+    satWrapper.appendChild(s);
+    return s;
+  }
+  const satTtsBtn = makeSatellite();
+  const satScrollBtn = makeSatellite();
+  satTtsBtn.title = '朗读';
+  satScrollBtn.title = '滚动';
+
+  let satVisible = false;
+  let satHideTimer = null;
+  const canHover = !!(window.matchMedia && window.matchMedia('(hover: hover)').matches);
+
+  function paintSatScroll() {
+    if (scrolling) { satScrollBtn.innerHTML = '\u25A0'; satScrollBtn.style.background = 'rgba(99,102,241,0.6)'; }
+    else { satScrollBtn.innerHTML = ICON_SCROLL_DOWN; satScrollBtn.style.background = 'rgba(22,22,28,0.72)'; }
+  }
+  function paintSatTts() {
+    const active = tts.playing && !tts.paused;
+    satTtsBtn.innerHTML = active ? '\u23F8' : '\u25B6';
+    satTtsBtn.style.background = active ? 'rgba(99,102,241,0.6)' : 'rgba(22,22,28,0.72)';
+  }
+
+  function positionSatellites() {
+    const SAT_SIZE = 40;
+    const SAT_RADIUS = SAT_SIZE / 2;
+    const SAT_OFFSET = 46;
+    const miniCY = lastYPosition + (BAR_H - 40) / 2 + 20;
+    const miniCX = panelSide === 'left' ? 20 : window.innerWidth - 20;
+    const satLeft = miniCX - SAT_RADIUS;
+    const satTopTts = miniCY - SAT_OFFSET - SAT_RADIUS;
+    const satTopScroll = miniCY + SAT_OFFSET - SAT_RADIUS;
+    satTtsBtn.style.left = satLeft + 'px';
+    satTtsBtn.style.top = satTopTts + 'px';
+    satScrollBtn.style.left = satLeft + 'px';
+    satScrollBtn.style.top = satTopScroll + 'px';
+    satTtsBtn.__hideDY = SAT_OFFSET;
+    satScrollBtn.__hideDY = -SAT_OFFSET;
+    if (!satVisible) {
+      satTtsBtn.style.transform = 'translate(0, ' + satTtsBtn.__hideDY + 'px) scale(0.2)';
+      satScrollBtn.style.transform = 'translate(0, ' + satScrollBtn.__hideDY + 'px) scale(0.2)';
+    }
+  }
+
+  function showSatellites() {
+    if (expanded || !canHover) return;
+    cancelSatHide();
+    if (satVisible) return;
+    satVisible = true;
+    positionSatellites();
+    satTtsBtn.style.pointerEvents = 'auto';
+    satScrollBtn.style.pointerEvents = 'auto';
+    requestAnimationFrame(() => {
+      satTtsBtn.style.opacity = '1';
+      satTtsBtn.style.transform = 'translate(0, 0) scale(1)';
+      satTtsBtn.style.filter = 'blur(0)';
+      satScrollBtn.style.opacity = '1';
+      satScrollBtn.style.transform = 'translate(0, 0) scale(1)';
+      satScrollBtn.style.filter = 'blur(0)';
+    });
+  }
+
+  function hideSatellites() {
+    if (!satVisible) return;
+    satVisible = false;
+    satTtsBtn.style.opacity = '0';
+    satTtsBtn.style.pointerEvents = 'none';
+    satTtsBtn.style.transform = 'translate(0, ' + (satTtsBtn.__hideDY || 46) + 'px) scale(0.2)';
+    satTtsBtn.style.filter = 'blur(4px)';
+    satScrollBtn.style.opacity = '0';
+    satScrollBtn.style.pointerEvents = 'none';
+    satScrollBtn.style.transform = 'translate(0, ' + (satScrollBtn.__hideDY || -46) + 'px) scale(0.2)';
+    satScrollBtn.style.filter = 'blur(4px)';
+  }
+
+  function cancelSatHide() { if (satHideTimer) { clearTimeout(satHideTimer); satHideTimer = null; } }
+  function scheduleSatHide() { cancelSatHide(); satHideTimer = setTimeout(() => { satHideTimer = null; hideSatellites(); }, 400); }
+
+  function setMiniBorderRadius() {
+    if (isDragging || miniBtn.__hovering) {
+      miniBtn.style.borderRadius = '50%';
+    } else if (panelSide === 'left') {
+      miniBtn.style.borderRadius = '0 50% 50% 0';
+    } else {
+      miniBtn.style.borderRadius = '50% 0 0 50%';
+    }
+  }
+
+  miniBtn.addEventListener('mouseenter', () => {
+    miniBtn.__hovering = true;
+    if (!isDragging) miniBtn.style.background = 'rgba(40,40,50,0.85)';
+    setMiniBorderRadius();
+    showSatellites();
+  });
+  miniBtn.addEventListener('mouseleave', () => {
+    miniBtn.__hovering = false;
+    miniBtn.style.background = 'rgba(22,22,28,0.72)';
+    setMiniBorderRadius();
+    scheduleSatHide();
+  });
+  satTtsBtn.addEventListener('mouseenter', cancelSatHide);
+  satTtsBtn.addEventListener('mouseleave', scheduleSatHide);
+  satScrollBtn.addEventListener('mouseenter', cancelSatHide);
+  satScrollBtn.addEventListener('mouseleave', scheduleSatHide);
+
+  satScrollBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTab !== 'scroll') switchTab('scroll');
+    if (scrolling) stopScroll(); else startScroll();
+  });
+  satTtsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTab !== 'tts') switchTab('tts');
+    ttsPauseToggle();
+  });
+
+  // ============================================================
   const btnRow = document.createElement('div');
   btnRow.style.cssText = 'display:flex;justify-content:space-around;align-items:flex-start;'+
     'padding:8px 10px 0 10px;user-select:none;';
@@ -347,6 +486,7 @@
   }
 
   function applyLayout() {
+    if (expanded) hideSatellites();
     bar.style.height = 'auto';
     if (expanded) {
       bar.style.display = 'block';
@@ -373,25 +513,21 @@
   let expandCleanupTimer = null;
   function expandFromMini() {
     if (expanded) return;
+    clearTimeout(collapseCleanupTimer);
     cancelCollapse();
+    hideSatellites();
+    miniBtn.style.opacity = '';
+    miniBtn.style.transform = '';
+    miniBtn.style.transition = 'background 0.18s ease, border-radius ' + (MINI_RADIUS_DURATION / 1000) + 's ' + ELASTIC_EASING;
+
     const mr = miniBtn.getBoundingClientRect();
     const finalLeft = panelSide === 'left' ? 0 : window.innerWidth - BAR_W;
-    const targetLeft = finalLeft + BAR_W / 2 - 20;
     lastYPosition = Math.max(8, mr.top - 8);
-    miniBtn.style.transition = 'none';
-    miniBtn.style.left = mr.left + 'px'; miniBtn.style.right = 'auto';
-    miniBtn.style.borderRadius = '50%';
-    void miniBtn.offsetWidth;
-    miniBtn.style.transition = 'left .2s ease, top .2s ease, border-radius .2s ease';
-    miniBtn.style.left = targetLeft + 'px';
-    miniBtn.style.top = (lastYPosition + 8) + 'px';
-    setTimeout(expandPanelMorph, 210);
-  }
-  function expandPanelMorph() {
+
     expanded = true;
     miniBtn.style.display = 'none';
-    miniBtn.style.transition = '';
     bar.style.display = 'block';
+    bar.style.opacity = '';
     body.style.display = 'flex';
     divider.style.display = 'block';
     btnScroll.cap.style.display = 'block';
@@ -403,15 +539,22 @@
     bar.style.height = 'auto';
     bar.style.overflow = 'hidden';
     const finalH = bar.offsetHeight;
-    const finalLeft = panelSide === 'left' ? 0 : window.innerWidth - BAR_W;
+
     bar.style.transition = 'none';
-    bar.style.left = (finalLeft + BAR_W / 2 - 20) + 'px'; bar.style.right = 'auto';
-    bar.style.top = (lastYPosition + 8) + 'px';
+    bar.style.left = mr.left + 'px';
+    bar.style.right = 'auto';
+    bar.style.top = mr.top + 'px';
     bar.style.width = '40px';
     bar.style.height = '40px';
-    bar.style.borderRadius = '12px';
+    bar.style.borderRadius = '50%';
     void bar.offsetHeight;
-    bar.style.transition = 'left .22s ease, width .22s ease, top .22s ease, height .22s ease, border-radius .22s ease';
+
+    bar.style.transition =
+      'left ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'width ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'top ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'height ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'border-radius ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING;
     requestAnimationFrame(() => {
       bar.style.left = finalLeft + 'px';
       bar.style.width = BAR_W + 'px';
@@ -419,6 +562,7 @@
       bar.style.height = finalH + 'px';
       bar.style.borderRadius = panelSide === 'left' ? '0 16px 16px 0' : '16px 0 0 16px';
     });
+
     clearTimeout(expandCleanupTimer);
     expandCleanupTimer = setTimeout(() => {
       bar.style.transition = '';
@@ -426,10 +570,88 @@
       bar.style.height = 'auto';
       positionBar();
       if (configVisible) positionConfigPanel();
-    }, 260);
+    }, ELASTIC_DURATION);
     try { localStorage.setItem(getExpandStorageKey(), 'true'); } catch (e) {}
   }
-  function toggleExpand() { expanded = !expanded; applyLayout(); }
+
+  let collapseCleanupTimer = null;
+  function collapsePanel() {
+    if (!expanded) return;
+    if (configVisible) closeConfig();
+    hideSatellites();
+
+    const rect = bar.getBoundingClientRect();
+    const targetLeft = panelSide === 'left' ? 0 : window.innerWidth - 40;
+    const targetTop = lastYPosition + (BAR_H - 40) / 2;
+
+    expanded = false;
+    bar.style.pointerEvents = 'none';
+
+    miniBtn.style.display = 'flex';
+    miniBtn.style.left = targetLeft + 'px';
+    miniBtn.style.right = 'auto';
+    miniBtn.style.top = targetTop + 'px';
+    miniBtn.style.opacity = '0';
+    miniBtn.style.transform = 'scale(0.72)';
+    miniBtn.style.transition = 'none';
+    miniBtn.style.borderRadius = panelSide === 'left' ? '0 50% 50% 0' : '50% 0 0 50%';
+    void miniBtn.offsetWidth;
+
+    bar.style.transition = 'none';
+    bar.style.overflow = 'hidden';
+    bar.style.left = rect.left + 'px';
+    bar.style.right = 'auto';
+    bar.style.top = rect.top + 'px';
+    bar.style.width = rect.width + 'px';
+    bar.style.height = rect.height + 'px';
+    void bar.offsetHeight;
+
+    bar.style.transition =
+      'left ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'width ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'top ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'height ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'border-radius ' + (ELASTIC_DURATION / 1000) + 's ' + ELASTIC_EASING + ', ' +
+      'opacity 0.28s ease 0.24s';
+
+    miniBtn.style.transition =
+      'opacity 0.32s ease 0.12s, ' +
+      'transform 0.42s ' + ELASTIC_EASING + ' 0.1s, ' +
+      'background 0.18s ease, ' +
+      'border-radius ' + (MINI_RADIUS_DURATION / 1000) + 's ' + ELASTIC_EASING;
+
+    requestAnimationFrame(() => {
+      bar.style.left = targetLeft + 'px';
+      bar.style.top = targetTop + 'px';
+      bar.style.width = '40px';
+      bar.style.height = '40px';
+      bar.style.borderRadius = panelSide === 'left' ? '0 50% 50% 0' : '50% 0 0 50%';
+      bar.style.opacity = '0';
+
+      miniBtn.style.opacity = '1';
+      miniBtn.style.transform = 'scale(1)';
+    });
+
+    clearTimeout(collapseCleanupTimer);
+    collapseCleanupTimer = setTimeout(() => {
+      bar.style.transition = '';
+      bar.style.overflow = '';
+      bar.style.pointerEvents = '';
+      bar.style.opacity = '';
+      bar.style.display = 'none';
+
+      miniBtn.style.transition = 'background 0.18s ease, border-radius ' + (MINI_RADIUS_DURATION / 1000) + 's ' + ELASTIC_EASING;
+      miniBtn.style.opacity = '';
+      miniBtn.style.transform = '';
+      positionMiniBtn();
+
+      try { localStorage.setItem(getExpandStorageKey(), 'false'); } catch (e) {}
+    }, ELASTIC_DURATION);
+  }
+
+  function toggleExpand() {
+    if (expanded) collapsePanel();
+  }
   btnMenu.cell.addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(); });
 
   let collapseTimer = null;
@@ -440,7 +662,7 @@
     collapseTimer = setTimeout(() => {
       collapseTimer = null;
       if (expanded && !isDragging && !configVisible && configPanel.style.display === 'none') {
-        expanded = false; applyLayout();
+        collapsePanel();
       }
     }, 600);
   }
@@ -451,8 +673,10 @@
 
   function positionMiniBtn() {
     miniBtn.style.top = (lastYPosition + (BAR_H - 40) / 2) + 'px';
-    if (panelSide === 'left') { miniBtn.style.left = '0px'; miniBtn.style.right = 'auto'; miniBtn.style.borderRadius = '0 50% 50% 0'; }
-    else { miniBtn.style.left = 'auto'; miniBtn.style.right = '0px'; miniBtn.style.borderRadius = '50% 0 0 50%'; }
+    if (panelSide === 'left') { miniBtn.style.left = '0px'; miniBtn.style.right = 'auto'; }
+    else { miniBtn.style.left = 'auto'; miniBtn.style.right = '0px'; }
+    setMiniBorderRadius();
+    positionSatellites();
   }
   function positionBar() {
     const h = bar.offsetHeight || BAR_H;
@@ -471,6 +695,8 @@
     offX = clientX - rect.left; offY = clientY - rect.top;
     bar.style.cursor = 'grabbing'; miniBtn.style.cursor = 'grabbing';
     cancelCollapse();
+    hideSatellites();
+    setMiniBorderRadius();
   }
   bar.addEventListener('mousedown', (e) => {
     if (e.target.closest && e.target.closest('[data-nodrag="true"]')) return;
@@ -484,7 +710,7 @@
     const x = Math.max(0, Math.min(e.clientX - offX, window.innerWidth - target.offsetWidth));
     lastYPosition = Math.max(8, Math.min(e.clientY - offY, window.innerHeight - target.offsetHeight));
     target.style.left = x + 'px'; target.style.right = 'auto'; target.style.top = lastYPosition + 'px';
-    if (!expanded) miniBtn.style.borderRadius = '50%';
+    if (!expanded) { setMiniBorderRadius(); positionSatellites(); }
     if (configVisible) positionConfigPanel();
   });
   document.addEventListener('mouseup', () => {
@@ -515,7 +741,7 @@
     const x = Math.max(0, Math.min(t.clientX - offX, window.innerWidth - target.offsetWidth));
     lastYPosition = Math.max(8, Math.min(t.clientY - offY, window.innerHeight - target.offsetHeight));
     target.style.left = x + 'px'; target.style.right = 'auto'; target.style.top = lastYPosition + 'px';
-    if (!expanded) miniBtn.style.borderRadius = '50%';
+    if (!expanded) { setMiniBorderRadius(); positionSatellites(); }
     if (configVisible) positionConfigPanel();
   }, { passive: true });
   document.addEventListener('touchend', () => {
@@ -694,6 +920,7 @@
   function paintScrollBtn() {
     if (scrolling) { btnScroll.btn.innerHTML = '\u25A0'; btnScroll.btn.classList.add('is-active'); btnScroll.btn.style.background = 'rgba(99,102,241,0.35)'; btnScroll.cap.innerText = '停止'; }
     else { btnScroll.btn.innerHTML = ICON_SCROLL_DOWN; btnScroll.btn.classList.remove('is-active'); btnScroll.btn.style.background = 'rgba(255,255,255,0.08)'; btnScroll.cap.innerText = '滚动'; }
+    paintSatScroll();
   }
   function startScroll() {
     let speed = parseInt(speedInput.value, 10); if (isNaN(speed) || speed < 1) speed = 1; if (speed > 100) speed = 100;
@@ -741,7 +968,11 @@
     }
     paintScrollBtn();
   }
-  btnScroll.cell.addEventListener('click', (e) => { e.stopPropagation(); if (scrolling) stopScroll(); else startScroll(); });
+  btnScroll.cell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTab !== 'scroll') switchTab('scroll');
+    if (scrolling) stopScroll(); else startScroll();
+  });
 
   function restoreScrollState() {
     try { const st = JSON.parse(sessionStorage.getItem(SCROLL_STATE_KEY));
@@ -780,7 +1011,6 @@
   const TTS_DROP_LINE = /上一章|下一章|上一页|下一页|返回目录|章节目录|加入书签|加入书架|投推荐票|我要报错|手机阅读|手机用户|最新网址|请记住|未完待续|本章完|笔趣阁|小说网|免费阅读|全文字|无弹窗|更新最快|作者：|作者:|字数：|点击|下载|朗读语速|语音音色|空格键朗读|空格键滚动|自定义下一页选择器|跳转延迟|自动跳转/i;
   const TTS_CONTAINER_SELS = ['#chaptercontent','#htmlContent','#contentdetail','#BookText','#nr1','#text','#booktxt','#chapterbody','#content_text','#content1','#articleContent','#con','#mlfy_main_text','.showtxt','.readcontent','.read-content','.chapter-content','.novelcontent','article','#content','.content','main'];
 
-  // ---------- 纯文本页面识别 ----------
   const PLAIN_TEXT_EXTS = new Set([
     'txt','text','log','md','markdown','rst','csv','tsv',
     'ini','conf','cfg','properties','env','toml','yaml','yml',
@@ -813,7 +1043,6 @@
   function ttsScoreBlock(el) { if (!(el instanceof HTMLElement)) return 0; if (TTS_NEG_RE.test(el.id + ' ' + el.className)) return 0; if (el.closest('nav, header, footer, aside, form, [data-asr-ui], script, style')) return 0; const text = (el.textContent || '').replace(/\s+/g, ''); if (text.length < 200) return 0; if (ttsLinkDensity(el) > 0.25) return 0; const pr = ttsPunctRatio(text); if (pr < 0.02) return 0; let score = Math.min(text.length, 8000); if (TTS_POS_RE.test(el.id + ' ' + el.className)) score *= 1.5; score *= (0.5 + Math.min(pr, 0.25) * 2); score += el.querySelectorAll('p').length * 20; return score; }
   function ttsFindContentRoot() { for (const s of TTS_CONTAINER_SELS) { const el = document.querySelector(s); if (!el) continue; const text = (el.textContent || '').replace(/\s+/g, ''); if (text.length > 200 && ttsLinkDensity(el) < 0.25 && ttsPunctRatio(text) > 0.02) return el; } let best = null, bestScore = 0; document.querySelectorAll('body div, body section').forEach(el => { const sc = ttsScoreBlock(el); if (sc > bestScore) { bestScore = sc; best = el; } }); return best; }
 
-  // 纯文本页面专用提取：优先取 <pre>，否则取 body.innerText；记录字符偏移以支持选中定位
   function ttsExtractPlainText() {
     const out = []; const seen = new Set();
     let raw = '';
@@ -870,8 +1099,6 @@
     return out;
   }
 
-  // <br> 换行分段：段落共享 root，记录每段的字符偏移（相对 root 文本总量）
-  // 这样选中文本时能用 textContent 偏移反查精确的段落索引，避免"永远返回第一段"
   function ttsExtractBrParagraphs(root) {
     const out = []; const seen = new Set();
     const skipTags = /^(SCRIPT|STYLE|SELECT|TEXTAREA|NOSCRIPT|IFRAME|OBJECT|EMBED)$/;
@@ -929,8 +1156,6 @@
   // ---------- 朗读控制 ----------
   const tts = { texts: [], idx: 0, playing: false, paused: false, voice: null, rate: 3, resumeTimer: null, watchdog: null, spokenCount: 0, startIdx: 0 };
 
-  // 检测页面选中文本对应的段落索引（-1 表示无选中 / 未找到）
-  // 三层判定：独立 elem 的 DOM 包含 → 共享 root 的字符偏移 → 文本片段匹配
   function findSelectedParagraphIndex() {
     try {
       const sel = window.getSelection();
@@ -943,7 +1168,6 @@
       const startEl = startNode.nodeType === 1 ? startNode : startNode.parentElement;
       if (!startEl) return -1;
 
-      // 判断是否所有段落共享同一个 elem（<br> 分段 / 纯文本 / body.innerText 兜底时会出现）
       const firstElem = tts.texts[0].elem;
       let sharedRoot = !!firstElem;
       for (let i = 1; i < tts.texts.length; i++) {
@@ -951,7 +1175,6 @@
       }
       if (tts.texts.some(t => !t.elem)) sharedRoot = false;
 
-      // 1) 独立 elem：DOM 包含判断
       if (!sharedRoot) {
         for (let i = 0; i < tts.texts.length; i++) {
           const el = tts.texts[i].elem;
@@ -959,7 +1182,6 @@
         }
       }
 
-      // 2) 共享 root + 有偏移信息：用文本节点累计偏移反查
       if (sharedRoot && firstElem && typeof tts.texts[0].startOffset === 'number' && firstElem.contains(startNode)) {
         if (startNode.nodeType === 3) {
           let acc = -1;
@@ -981,7 +1203,6 @@
         }
       }
 
-      // 3) 文本片段匹配（前 20 字 → 前 8 字兜底）
       const snippet = sel.toString().replace(/\s+/g, ' ').trim().slice(0, 20);
       if (snippet) {
         for (let i = 0; i < tts.texts.length; i++) {
@@ -1002,7 +1223,7 @@
     }
   }
 
-  function paintPlayBtn() { const active = tts.playing && !tts.paused; btnPlay.btn.innerHTML = active ? '\u23F8' : '\u25B6'; if (active) btnPlay.btn.classList.add('is-active'); else btnPlay.btn.classList.remove('is-active'); btnPlay.btn.style.background = active ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'; btnPlay.cap.innerText = active ? '暂停' : '朗读'; }
+  function paintPlayBtn() { const active = tts.playing && !tts.paused; btnPlay.btn.innerHTML = active ? '\u23F8' : '\u25B6'; if (active) btnPlay.btn.classList.add('is-active'); else btnPlay.btn.classList.remove('is-active'); btnPlay.btn.style.background = active ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'; btnPlay.cap.innerText = active ? '暂停' : '朗读'; paintSatTts(); }
   let playHintTimer = null;
   function flashPlayHint(msg) {
     clearTimeout(playHintTimer);
@@ -1131,7 +1352,11 @@
     const href = nextBtn.getAttribute('href');
     if (nextBtn.tagName === 'A' && isSafeHref(href)) location.href = nextBtn.href; else nextBtn.click();
   }
-  btnPlay.cell.addEventListener('click', (e) => { e.stopPropagation(); ttsPauseToggle(); });
+  btnPlay.cell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTab !== 'tts') switchTab('tts');
+    ttsPauseToggle();
+  });
 
   function ttsPickVoice(vs) { const zh = vs.filter(v => /^zh([-_]|$)/i.test(v.lang)); const localZh = zh.filter(v => v.localService); return localZh.find(v => /xiaoxiao|xiaoyi|yunjian|hui|han|mei|ting/i.test(v.name)) || localZh[0] || zh.find(v => !/google|online|network/i.test(v.name)) || zh[0] || vs.find(v => v.localService) || vs[0] || null; }
   function ttsLoadVoices() {
