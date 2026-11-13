@@ -8,7 +8,7 @@
 
 一个轻量、高效的浏览器油猴脚本（Tampermonkey / Violentmonkey），专为网页阅读场景设计。支持自动滚动、智能翻页、整章朗读、从选中处朗读与阅读辅助，适用于长页面浏览、连续阅读、护眼听读等多种场景，并支持浏览器直接打开的纯文本页（`.txt` / `.log` / `.md` / 代码文件等）朗读。
 
-![version](https://img.shields.io/badge/version-3.3-blue)
+![version](https://img.shields.io/badge/version-3.2.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
 
@@ -57,7 +57,7 @@
 通用脚本无法针对每个站点做定向适配，以下场景可能达不到理想效果：
 
 - **楼层 / 用户信息混杂的社区页**（贴吧、知乎回答、Reddit、V2EX、传统论坛等）：正文识别可能把用户名、发帖时间、"回复/赞/踩"、签名档等元信息也读进去。如遇此情况，可在「自定义下一页选择器」中通过 CSS 选择器指定正文容器（如贴吧 `.d_post_content`、知乎 `.RichText`、V2EX `.topic_content`）。
-- **`<br>` 分段页面的选中朗读**：v3.3 已修复"永远从第一段开始"的问题，但若同一段文本在同一页面出现多次，仍可能定位到第一次出现的位置。
+- **`<br>` 分段页面的选中朗读**：v3.2.1 已修复"永远从第一段开始"的问题，但若同一段文本在同一页面出现多次，仍可能定位到第一次出现的位置。
 - **动态加载 / Shadow DOM 页面**：部分现代 SPA 用 Shadow DOM 渲染内容，`document.querySelector` 无法穿透，可能识别失败。
 - **公式与图表**：TTS 引擎对数学公式、图表内的文字支持有限，朗读时可能跳过或读得不通顺。
 
@@ -174,7 +174,7 @@
 - **提取**：优先取 `<pre>` 内容，无 `<pre>` 时取 `body.innerText`；按 `\n` 分段，单行 > 500 字时按句末标点二次切分
 - **隔离**：纯文本分支不调用 `ttsFindContentRoot`，不参与 DOM 启发式打分
 
-#### 选中定位（v3.3）
+#### 选中定位（v3.2.1）
 三段式判定，从精确到粗略：
 1. **独立 elem 段落**（`<p>` 分段）：直接 DOM 包含判断
 2. **共享 root 段落**（`<br>` 分段 / 纯文本）：遍历 root 内文本节点累计字符偏移，用偏移落入 `[startOffset, endOffset)` 区间匹配
@@ -217,12 +217,205 @@ MIT License
 
 A lightweight and efficient userscript (Tampermonkey / Violentmonkey) designed for web reading scenarios. Supports auto-scroll, smart page navigation, full-chapter reading, read-from-selection, and reading assistance — suitable for long-page browsing, continuous reading, eye-friendly listen-reading, and more. Also supports plain-text pages opened directly in the browser (`.txt` / `.log` / `.md` / code files).
 
-![version](https://img.shields.io/badge/version-3.3-blue)
+![version](https://img.shields.io/badge/version-3.2.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
 
 ### 🆕 Latest Updates
 
-#### v3.3 · Selection-Reading Compatibility Fix + Default Rate 3
+#### v3.2.1 · Selection-Reading Compatibility Fix + Default Rate 3
 - **Fixed selection-reading failure on `<br>`-separated pages**: Tieba, Zhihu answers, V2EX, Jianshu, and similar pages that split paragraphs with `<br>` or newlines no longer always start reading from the first paragraph — the selected paragraph is now correctly located
-- Mechanism: `ttsExtractParagraphs` was refactored into a `<p
+- Mechanism: `ttsExtractParagraphs` was refactored into a `<p>` branch + a `<br>` branch (recording character offsets), and `findSelectedParagraphIndex` now includes "shared-root offset lookup" and "short-snippet fallback"
+- Plain-text pages (`.txt` / `.md` / code files) also support offset-based positioning
+- **Default reading rate changed to 3** (was 2); previously saved rate settings are preserved
+
+#### v3.2 · Plain-Text Page Support
+- Plain-text pages (`.txt` / `.log` / `.md` / `.csv` / code files like `.py` / `.js` / `.json`) can now be **read aloud normally**
+- Dual detection via MIME type + URL extension, **without interfering** with normal webpage content detection
+- Supports `file://` local files (requires enabling "Allow access to file URLs" in your userscript manager)
+- Long lines without newlines are auto-split at sentence-ending punctuation to avoid reading stutter
+
+#### v3.1 · Reading Experience Enhancements
+- **Read from selection**: if text is selected, reading starts from that paragraph
+- **Pause & resume**: on resume, restarts from the selection if one exists; otherwise continues from where it stopped
+- **Reading failure guard**: engine errors or recognition failures **no longer trigger auto-navigation**
+- **Smooth-scroll conflict fix**: temporarily disables the site's `scroll-behavior: smooth` during auto-scroll
+- **Detection performance optimization**: text matching and visibility checks are split into two phases
+
+👉 Full version history is in the [Changelog](#-full-changelog) at the end.
+
+### 🎯 Use Cases
+
+| Scenario | Typical Sites / Content | Recommended Feature |
+| --- | --- | --- |
+| **Web novels / serialized fiction** | Qidian, Fanqie, Biquge, Jinjiang, Zongheng, etc. | Auto-scroll + auto-continue after finishing a chapter |
+| **Manga / webtoons** | Bilibili Comics, Kuaikan, Tencent Comics, long-image pages | Continuous scroll for long strips, no manual page-turning |
+| **Academic papers / technical docs** | arXiv, PubMed Central, IEEE Xplore, ar5iv, MDN, official API docs | Smooth scroll on long pages; select abstract or a section to read aloud |
+| **Plain-text files** | `.txt` / `.log` / `.md` / `.csv` / code files opened in browser | Line-by-line reading; `file://` local files also supported |
+| **News / blog articles** | Major news sites, personal blogs, Medium, Substack | One-tap smooth reading, hands-free |
+| **Online courses / tutorials** | MOOC platforms, tutorial sites, Codecademy-style interactive tutorials | Listen while taking notes, or scroll alongside code |
+| **Forum posts / community long reads** | Cleanly structured forums (e.g. Discourse); complex thread-based communities like Zhihu / Tieba / Reddit **require custom selectors** | Scrolling works; reading may include usernames and floor metadata — see "Known Limitations" |
+| **E-books / encyclopedia entries** | Wikipedia, wiki sites, online e-book readers | Long reading sessions without eye strain |
+| **Legal documents / contracts / manuals** | Online contracts, product manuals, standards documents | Reading aloud helps with proofreading |
+| **WeChat articles / social media long posts** | WeChat public accounts, Weibo long posts, Jike long posts | One-tap smooth scroll on desktop, listen-reading on mobile |
+| **Foreign-language learning materials** | English news, bilingual articles, language-learning sites | TTS reading for pronunciation and listening practice |
+| **Accessibility / eye-care** | Prolonged reading, visual fatigue, night mode | Reading aloud replaces staring at the screen |
+
+### ⚠️ Known Limitations
+
+A generic userscript cannot be tailored to every site. The following scenarios may not work ideally:
+
+- **Thread-based community pages** (Tieba, Zhihu answers, Reddit, V2EX, traditional forums): content recognition may also read usernames, timestamps, "reply/upvote/downvote" controls, signatures, etc. If this happens, specify the content container via a CSS selector in "Custom next-page selector" (e.g. Tieba `.d_post_content`, Zhihu `.RichText`, V2EX `.topic_content`).
+- **Selection-reading on `<br>`-separated pages**: v3.2.1 fixes the "always starts from the first paragraph" problem, but if the same text appears more than once on the page, it may still anchor to the first occurrence.
+- **Dynamically loaded / Shadow DOM pages**: some modern SPAs render content inside Shadow DOM, which `document.querySelector` cannot traverse; recognition may fail.
+- **Formulas and figures**: TTS engines have limited support for math formulas and text inside figures; reading may skip them or sound unnatural.
+
+### ✨ Key Features
+
+#### Auto Scroll
+- Based on `requestAnimationFrame` for frame-rate-independent smooth experience
+- 1-100 level speed adjustment with real-time effect
+- Per-domain speed settings automatically saved
+- Temporarily disables the site's `scroll-behavior: smooth` during auto-scroll
+
+#### Smart Page Navigation
+- Multi-layer DOM scanning strategy (semantic areas prioritized)
+- Auto-detect "Next Page / Next Chapter" buttons
+- Early viewport trigger to avoid unnecessary bottom content
+- Auto-navigation disabled by default to prevent accidents
+
+#### Full-Chapter Reading
+- Intelligent main content recognition (supports various container structures)
+- Segment-by-segment reading with synchronized scrolling and highlighting
+- Voice selection, speed adjustment (0.5-5, **default 3**), and preview functionality
+- **Read from selection**: if text is selected, reading starts from that paragraph
+- **Pause & resume**: on resume, restarts from the selection if one exists; otherwise continues from where it stopped
+- Auto-continue to next chapter after reading ends
+- **Failure guard**: reading failures will not trigger auto-navigation
+
+#### Plain-Text Page Support (new in v3.2)
+- Precise detection via `document.contentType` + URL extension
+- Coverage: documents/config (`.txt` / `.log` / `.md` / `.csv` / `.json` / `.yaml` / `.ini`), code (`.py` / `.js` / `.java` / `.go` / `.rs`), etc.
+- Split by newlines; over-long lines split at sentence-ending punctuation
+- **Fully isolated** from the DOM heuristics for normal web pages
+
+#### Universal Compatibility
+- Works with most websites
+- Semi-transparent UI that doesn't block content
+- Floating button auto-attaches to screen edges
+- Dual-tab mode (Scroll / Reading tabs separated)
+
+#### Safety & Performance
+- Dangerous protocol filtering (javascript:, data:, etc.)
+- Layered scanning + throttling strategy
+- Smooth performance on long pages
+
+### 📦 Installation
+
+1. Install browser extension: [Tampermonkey](https://www.tampermonkey.net/), Violentmonkey, or Greasemonkey
+2. [Click to install script](https://update.greasyfork.org/scripts/590642/AutoReader.user.js)
+3. Visit any webpage and click the floating button to start
+
+> **Using local files (`file://`)**: you need to enable "Allow access to file URLs" in your userscript manager's extension details page, otherwise the script won't run on local `.txt` files.
+
+### 🎮 Quick Start
+
+| Action | Description |
+| --- | --- |
+| Click ≡ floating button | Expand control panel |
+| Click ▶ / ■ (Scroll tab) | Start / stop scrolling |
+| Click ▶ / ⏸ (Reading tab) | Play / pause / resume reading |
+| Select text, then click ▶ (Reading tab) | Start reading from the selected paragraph |
+| Click tab label | Switch between scroll and reading modes |
+| Press `Space` | Start / stop current mode (toggle required first) |
+| Drag floating button | Attach to screen edge, position auto-saved |
+| Mouse leave panel | Auto-collapse after 0.6 seconds |
+
+**How reading stops**: automatically at the end of the chapter / switching to the Scroll tab / starting auto-scroll.
+
+### ⚙️ Configuration Options
+
+#### Scroll Mode
+- **Scroll Speed**: 1-100 levels
+- **Jump Delay**: 0-10 seconds (default 2s)
+- **Space Key Control**: Disabled by default
+- **Auto-Navigation**: Disabled by default (enables auto-flip at page end)
+
+#### Reading Mode
+- **Reading Speed**: 0.5-5, **default 3** (doesn't interrupt the current sentence; applies from the next one)
+- **Voice Selection**: Local/online voices with preview on switch
+- **Space Key Control**: Disabled by default
+- **Auto-Continue**: Auto-jump to next chapter and continue reading
+- **Start Position**: if text is selected when starting, reading begins at that paragraph; otherwise from the top
+- **Pause & Resume Rules**:
+  - Resume **with** a selection → restart from the selection
+  - Resume **without** a selection → continue from where it stopped
+- **Failure Guard**: reading is considered "finished" only when the number of paragraphs actually spoken reaches 80% of the expected count; otherwise it stops **without** navigating
+
+#### Custom Rules
+When auto-detection doesn't work, configure rules for specific websites:
+- **Domain Pattern**: e.g., `*qidian.com*` (wildcard supported)
+- **CSS Selector**: Precisely specify next-page button
+- **Text Keyword**: Secondary verification of button text
+- **Escape Support**: Use `\|` to escape `|` character
+
+### 🧠 Technical Design
+
+#### Next Page Detection
+The script uses intelligent multi-layer scanning:
+1. **Layer 1**: Prioritizes semantic areas (`nav`, `article`, `footer`, etc.)
+2. **Layer 2**: Supplements with interactive elements in full document (`<a>`, `<button>`, etc.)
+3. **Layer 3**: Fallback scans container elements, filters meaningless small nodes
+
+Text matching and visibility checks run in two phases: candidates are first filtered by `textContent` (no layout cost), then only the few hits are validated with `getBoundingClientRect`, avoiding layout thrash on large pages. Parsed custom rules are cached and only re-parsed when the rule text changes.
+
+Detection is throttled at 600ms intervals; stops when button enters bottom 30% of viewport.
+
+#### Reading Recognition
+- Prioritizes common main-content containers (`#content`, `.readcontent`, `article`, etc.)
+- Heuristic scoring: text length, punctuation density, link ratio
+- Segments by `<p>`; falls back to `<br>` / newline splitting when `<p>` is scarce
+- Filters noise (previous/next chapter, ads, etc.)
+- Auto-scrolls to center of viewport and highlights during segment playback (skipped on `<br>`-separated pages with no per-segment anchors)
+
+#### Plain-Text Page Routing (v3.2)
+- **Detection**: `document.contentType` matching `text/plain`, `text/markdown`, `application/json`, etc. → plain-text branch; `text/html` and other explicit web types are rejected; URL extension used as fallback when MIME is missing
+- **Extraction**: prefer `<pre>` content, fall back to `body.innerText`; split by `\n`; lines over 500 characters are re-split at sentence-ending punctuation
+- **Isolation**: the plain-text branch never calls `ttsFindContentRoot` and doesn't participate in DOM heuristic scoring
+
+#### Selection Anchoring (v3.2.1)
+Three-tier lookup, from precise to coarse:
+1. **Per-element paragraphs** (`<p>`-based): direct DOM containment check
+2. **Shared-root paragraphs** (`<br>`-based / plain text): accumulates character offset by walking text nodes in the root, then matches against `[startOffset, endOffset)`
+3. **Text snippet fallback**: first 20 characters of the selection, then first 8
+
+Uses `startContainer` rather than `anchorNode`, so dragging the selection upward still anchors to the earlier paragraph in document order.
+
+#### Failure Guard (v3.1)
+- Tracks `spokenCount`, the number of paragraphs that actually fired `onstart`
+- Expected count = total paragraphs − start index
+- "Finished" requires `spokenCount ≥ expected × 80%`; otherwise it is treated as a failure: stop, **no navigation**
+
+#### Scroll Stability
+- Inter-frame delta is capped at 100ms, so returning from a background tab doesn't cause a jump
+- Auto-navigation uses a generation token; any `stopScroll` / restart invalidates pending navigation timers
+
+### 📄 License
+
+MIT License
+
+### 📝 Full Changelog
+
+| Version | Updates |
+| --- | --- |
+| **v3.2.1** | Fixed selection-reading always starting from the first paragraph on `<br>`-separated pages (shared-root offset lookup + short-snippet fallback); offset-based positioning for plain-text pages; default reading rate changed to 3 |
+| **v3.2** | Added plain-text page support (routed by MIME + URL extension); supports `file://` local files; over-long lines split at sentence-ending punctuation |
+| **v3.1** | Added read-from-selection, pause & resume, reading failure guard, smooth-scroll conflict fix, detection performance optimizations |
+| **v3.0.2** | Code optimizations |
+| **v3.0.1** | Fixed: occasional layout glitches; hardened content detection with relaxed threshold for short articles; occasional first-sentence swallowing |
+| **v3.0** | Added full-chapter reading, intelligent content recognition, segment highlighting, voice/speed adjustment, auto-continue |
+| **v2.2** | Auto-navigation now disabled by default, new independent toggle |
+| **v2.1** | Floating panel optimization, space key changed to panel toggle, avoid input field conflicts |
+| **v2.0** | Early viewport trigger, semi-transparent UI, performance optimization, security hardening |
+| **v1.9** | Multi-layer scanning, rule escaping, protocol filtering |
+| **v1.0** | Initial release: basic scrolling, speed control, floating button attachment |
